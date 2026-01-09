@@ -213,12 +213,12 @@ export default function NewsInbox() {
                   <Label htmlFor="category" className="text-sm text-muted-foreground mb-2 block">
                     Category
                   </Label>
-                  <Select value={selectedCategory || ""} onValueChange={(value) => setSelectedCategory(value || null)}>
+                  <Select value={selectedCategory || "all"} onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}>
                     <SelectTrigger className="bg-input border-border">
                       <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
-                      <SelectItem value="">All categories</SelectItem>
+                      <SelectItem value="all">All categories</SelectItem>
                       {categories.map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
