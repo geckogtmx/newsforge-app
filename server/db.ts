@@ -1,6 +1,23 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  InsertUser,
+  users,
+  newsSources,
+  InsertNewsSource,
+  runs,
+  InsertRun,
+  rawHeadlines,
+  InsertRawHeadline,
+  compiledItems,
+  InsertCompiledItem,
+  contentPackages,
+  InsertContentPackage,
+  runArchives,
+  InsertRunArchive,
+  userSettings,
+  InsertUserSettings,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +106,141 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// NewsForge Database Helpers
+
+export async function getNewsSources(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(newsSources).where(eq(newsSources.userId, userId));
+}
+
+export async function createNewsSource(data: InsertNewsSource) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(newsSources).values(data);
+  return result;
+}
+
+export async function updateNewsSource(id: number, data: Partial<InsertNewsSource>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(newsSources).set(data).where(eq(newsSources.id, id));
+}
+
+export async function deleteNewsSource(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(newsSources).where(eq(newsSources.id, id));
+}
+
+export async function createRun(data: InsertRun) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(runs).values(data);
+  return result;
+}
+
+export async function getRun(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(runs).where(eq(runs.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateRun(id: number, data: Partial<InsertRun>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(runs).set(data).where(eq(runs.id, id));
+}
+
+export async function getUserRuns(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(runs).where(eq(runs.userId, userId)).orderBy(runs.createdAt);
+}
+
+export async function createRawHeadline(data: InsertRawHeadline) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(rawHeadlines).values(data);
+}
+
+export async function getRunHeadlines(runId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(rawHeadlines).where(eq(rawHeadlines.runId, runId));
+}
+
+export async function updateHeadlineSelection(id: number, isSelected: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(rawHeadlines).set({ isSelected }).where(eq(rawHeadlines.id, id));
+}
+
+export async function createCompiledItem(data: InsertCompiledItem) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(compiledItems).values(data);
+}
+
+export async function getCompiledItems(runId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(compiledItems).where(eq(compiledItems.runId, runId));
+}
+
+export async function updateCompiledItem(id: number, data: Partial<InsertCompiledItem>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(compiledItems).set(data).where(eq(compiledItems.id, id));
+}
+
+export async function createContentPackage(data: InsertContentPackage) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(contentPackages).values(data);
+}
+
+export async function getContentPackages(runId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(contentPackages).where(eq(contentPackages.runId, runId));
+}
+
+export async function updateContentPackage(id: number, data: Partial<InsertContentPackage>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(contentPackages).set(data).where(eq(contentPackages.id, id));
+}
+
+export async function createRunArchive(data: InsertRunArchive) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(runArchives).values(data);
+}
+
+export async function getUserArchives(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(runArchives).where(eq(runArchives.userId, userId));
+}
+
+export async function getUserSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function upsertUserSettings(data: InsertUserSettings) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(userSettings).values(data).onDuplicateKeyUpdate({
+    set: {
+      tone: data.tone,
+      format: data.format,
+      obsidianVaultPath: data.obsidianVaultPath,
+      llmModel: data.llmModel,
+    },
+  });
+}
