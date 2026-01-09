@@ -42,8 +42,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             const Icon = item.icon;
             const active = isActive(item.path);
             return (
-              <Link key={item.path} href={item.path}>
-                <a
+              <Link
+                key={item.path}
+                href={item.path}
                 className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
@@ -52,7 +53,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-sm font-medium">{item.label}</span>
-              </a>
               </Link>
             );
           })}
