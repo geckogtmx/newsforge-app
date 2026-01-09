@@ -147,15 +147,13 @@ export default function NewsInbox() {
           Broader Web Search
         </Button>
         <Link href="/compile">
-          <a>
-            <Button
-              disabled={selectedCount === 0}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              Continue to Compile
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          </a>
+          <Button
+            disabled={selectedCount === 0}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+          >
+            Continue to Compile
+            <ChevronRight className="w-4 h-4 ml-2" />
+          </Button>
         </Link>
       </div>
     </div>

@@ -84,36 +84,30 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Link href="/run">
-                <a className="block">
-                  <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Start New Run</CardTitle>
-                      <CardDescription>Begin a new news compilation workflow</CardDescription>
-                    </CardHeader>
-                  </Card>
-                </a>
+                <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Start New Run</CardTitle>
+                    <CardDescription>Begin a new news compilation workflow</CardDescription>
+                  </CardHeader>
+                </Card>
               </Link>
 
               <Link href="/sources">
-                <a className="block">
-                  <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Manage Sources</CardTitle>
-                      <CardDescription>Configure your news sources</CardDescription>
-                    </CardHeader>
-                  </Card>
-                </a>
+                <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Manage Sources</CardTitle>
+                    <CardDescription>Configure your news sources</CardDescription>
+                  </CardHeader>
+                </Card>
               </Link>
 
               <Link href="/archive">
-                <a className="block">
-                  <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
-                    <CardHeader>
-                      <CardTitle className="text-lg">View Archive</CardTitle>
-                      <CardDescription>Browse previous runs</CardDescription>
-                    </CardHeader>
-                  </Card>
-                </a>
+                <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer h-full">
+                  <CardHeader>
+                    <CardTitle className="text-lg">View Archive</CardTitle>
+                    <CardDescription>Browse previous runs</CardDescription>
+                  </CardHeader>
+                </Card>
               </Link>
             </div>
           </div>
@@ -121,12 +115,10 @@ export default function Dashboard() {
           {/* CTA Button */}
           <div className="flex justify-center pt-4">
             <Link href="/run">
-              <a>
-                <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Play className="w-5 h-5 mr-2" />
-                  Start New Run
-                </Button>
-              </a>
+              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Play className="w-5 h-5 mr-2" />
+                Start New Run
+              </Button>
             </Link>
           </div>
         </div>
