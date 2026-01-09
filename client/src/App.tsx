@@ -8,6 +8,8 @@ import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Sources from "./pages/Sources";
 import NewsInbox from "./pages/NewsInbox";
+import Archive from "./pages/Archive";
+import Settings from "./pages/Settings";
 
 function Router() {
   return (
@@ -25,6 +27,16 @@ function Router() {
       <Route path={"/run"}>
         <AppLayout>
           <NewsInbox />
+        </AppLayout>
+      </Route>
+      <Route path={"/archive"}>
+        <AppLayout>
+          <Archive />
+        </AppLayout>
+      </Route>
+      <Route path={"/settings"}>
+        <AppLayout>
+          <Settings />
         </AppLayout>
       </Route>
       <Route path={"/404"} component={NotFound} />

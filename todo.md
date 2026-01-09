@@ -121,17 +121,17 @@
 - [ ] Add "Archive Run" button
 
 ## Phase 18: Frontend - Settings
-- [ ] Create Settings page component
-- [ ] Implement tone preference selector
-- [ ] Add format/structure template editor
-- [ ] Implement Obsidian vault path input
-- [ ] Add LLM model selection
-- [ ] Implement save settings functionality
+- [x] Create Settings page component
+- [x] Implement tone preference selector
+- [x] Add format/structure template editor
+- [x] Implement Obsidian vault path input
+- [x] Add LLM model selection
+- [x] Implement save settings functionality
 
 ## Phase 19: Frontend - Archive
-- [ ] Create Archive page component
-- [ ] Display list of archived runs
-- [ ] Implement run details view
+- [x] Create Archive page component with run history display
+- [x] Display list of archived runs with filtering and sorting
+- [x] Implement run details view/modal
 - [ ] Add retrieve/restore functionality
 - [ ] Implement export functionality for archived runs
 
