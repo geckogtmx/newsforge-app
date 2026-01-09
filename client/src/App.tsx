@@ -10,6 +10,8 @@ import Sources from "./pages/Sources";
 import NewsInbox from "./pages/NewsInbox";
 import Archive from "./pages/Archive";
 import Settings from "./pages/Settings";
+import Compilation from "./pages/Compilation";
+import ContentPackage from "./pages/ContentPackage";
 
 function Router() {
   return (
@@ -37,6 +39,16 @@ function Router() {
       <Route path={"/settings"}>
         <AppLayout>
           <Settings />
+        </AppLayout>
+      </Route>
+      <Route path={"/compile"}>
+        <AppLayout>
+          <Compilation />
+        </AppLayout>
+      </Route>
+      <Route path={"/content"}>
+        <AppLayout>
+          <ContentPackage />
         </AppLayout>
       </Route>
       <Route path={"/404"} component={NotFound} />

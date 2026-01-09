@@ -89,28 +89,28 @@
 - [ ] Add delete source functionality
 
 ## Phase 14: Frontend - News Inbox
-- [ ] Create News Inbox page component
-- [ ] Display raw headlines in list format
-- [ ] Implement checkbox selection for headlines
-- [ ] Add headline details (title, source, link, publish date)
-- [ ] Implement broader web search interface
-- [ ] Add search results display
-- [ ] Implement "Continue to Compile" button
+- [x] Create News Inbox page component
+- [x] Display raw headlines in list format
+- [x] Implement checkbox selection for headlines
+- [x] Add headline details (title, source, link, publish date)
+- [x] Implement broader web search interface
+- [x] Add search results display
+- [x] Implement "Continue to Compile" button
 
 ## Phase 15: Frontend - Compilation Review
-- [ ] Create Compilation Review page component
-- [ ] Display compiled items with topics, hooks, and summaries
-- [ ] Implement checkbox selection for final items
-- [ ] Add item details view
-- [ ] Implement "Continue to Content Package" button
+- [x] Create Compilation Review page component
+- [x] Display compiled items with topics, hooks, and summaries
+- [x] Implement checkbox selection for final items
+- [x] Add item details view
+- [x] Implement "Continue to Content Package" button
 
 ## Phase 16: Frontend - Content Package Generation
-- [ ] Create Content Package page component
-- [ ] Display selected compiled items
-- [ ] Show generated YouTube assets (title, description, script outline)
-- [ ] Implement content editing interface
-- [ ] Add "Request Changes" button for LLM regeneration
-- [ ] Implement "Finalize" button
+- [x] Create Content Package page component
+- [x] Display selected compiled items
+- [x] Show generated YouTube assets (title, description, script outline)
+- [x] Implement content editing interface
+- [x] Add "Request Changes" button for LLM regeneration
+- [x] Implement "Finalize" button
 
 ## Phase 17: Frontend - Review & Edit
 - [ ] Create Review & Edit page component
