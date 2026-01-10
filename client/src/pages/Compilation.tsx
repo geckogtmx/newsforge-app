@@ -1,301 +1,314 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, Edit2, RefreshCw, Loader2, Zap } from "lucide-react";
-import { Link } from "wouter";
+import { ChevronRight, Edit2, RefreshCw, Loader2, Zap, AlertCircle } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
-
-interface CompiledItem {
-  id: number;
-  topic: string;
-  hook: string;
-  summary: string;
-  sourceCount: number;
-  selected: boolean;
-  isRegenerating?: boolean;
-}
+import { trpc } from "@/lib/trpc";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Compilation() {
-  const [items, setItems] = useState<CompiledItem[]>([
-    {
-      id: 1,
-      topic: "GPT-5 Release",
-      hook: "OpenAI's newest model breaks new ground in multimodal AI",
-      summary:
-        "OpenAI has released GPT-5, featuring advanced multimodal capabilities for processing images, videos, and text. The model demonstrates significant improvements in reasoning, code generation, and creative tasks. Early benchmarks show a 40% improvement over GPT-4 in complex reasoning tasks.",
-      sourceCount: 3,
-      selected: false,
-    },
-    {
-      id: 2,
-      topic: "AI Funding Surge",
-      hook: "Major AI companies secure billions in new funding rounds",
-      summary:
-        "Anthropic raised $5B in Series C funding, while other AI companies continue to attract significant investment. This funding wave reflects growing confidence in AI technology and increased competition in the space. Total AI funding in 2026 is projected to exceed $100B.",
-      sourceCount: 4,
-      selected: false,
-    },
-    {
-      id: 3,
-      topic: "Open Source AI",
-      hook: "Meta releases open-source models to democratize AI access",
-      summary:
-        "Meta has released new open-source AI models, making advanced machine learning technology accessible to developers worldwide. This move aims to democratize AI and accelerate innovation in the open-source community. The models are available on Hugging Face and GitHub.",
-      sourceCount: 2,
-      selected: false,
-    },
-    {
-      id: 4,
-      topic: "AI Safety Research",
-      hook: "New alignment framework addresses critical AI safety concerns",
-      summary:
-        "Leading AI safety researchers have published a groundbreaking framework for aligning AI systems with human values. The framework provides practical methods for ensuring AI systems behave in accordance with human intentions. This research is expected to influence AI development practices across the industry.",
-      sourceCount: 2,
-      selected: false,
-    },
-  ]);
+  const [location] = useLocation();
+  const searchParams = new URLSearchParams(location.split("?")[1]);
+  const runId = searchParams.get("runId") || "";
 
-  const [selectedCount, setSelectedCount] = useState(0);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValues, setEditValues] = useState<Partial<CompiledItem>>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [regenerateInstructions, setRegenerateInstructions] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentRegenerateId, setCurrentRegenerateId] = useState<string | null>(null);
 
-  const handleSelectItem = (id: number) => {
-    setItems(
-      items.map((item) => {
-        if (item.id === id) {
-          setSelectedCount(item.selected ? selectedCount - 1 : selectedCount + 1);
-          return { ...item, selected: !item.selected };
-        }
-        return item;
-      })
-    );
+  // Fetch compiled items for this run
+  const { data: items = [], isLoading, error, refetch } = trpc.compilation.getCompiledItems.useQuery(
+    { runId },
+    { enabled: !!runId }
+  );
+
+  const updateSelection = trpc.compilation.updateSelection.useMutation({
+    onSuccess: () => {
+      toast.success("Selection updated");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update selection: ${error.message}`);
+    },
+  });
+
+  const regenerateItem = trpc.compilation.regenerateItem.useMutation({
+    onSuccess: () => {
+      toast.success("Item regenerated successfully");
+      refetch();
+      setRegeneratingId(null);
+      setDialogOpen(false);
+      setRegenerateInstructions("");
+    },
+    onError: (error) => {
+      toast.error(`Failed to regenerate: ${error.message}`);
+      setRegeneratingId(null);
+    },
+  });
+
+  const handleSelectItem = (id: string) => {
+    const newSelected = selectedItemIds.includes(id)
+      ? selectedItemIds.filter((itemId) => itemId !== id)
+      : [...selectedItemIds, id];
+
+    setSelectedItemIds(newSelected);
+
+    // Update in database
+    updateSelection.mutate({
+      itemIds: [id],
+      isSelected: !selectedItemIds.includes(id),
+    });
   };
 
   const handleSelectAll = () => {
-    const allSelected = items.every((item) => item.selected);
-    setItems(items.map((item) => ({ ...item, selected: !allSelected })));
-    setSelectedCount(allSelected ? 0 : items.length);
+    const allSelected = items.length > 0 && selectedItemIds.length === items.length;
+    const newSelected = allSelected ? [] : items.map((item) => item.id);
+
+    setSelectedItemIds(newSelected);
+
+    // Update in database
+    updateSelection.mutate({
+      itemIds: items.map((item) => item.id),
+      isSelected: !allSelected,
+    });
   };
 
-  const handleEditStart = (item: CompiledItem) => {
-    setEditingId(item.id);
-    setEditValues({ ...item });
+  const handleRegenerateClick = (id: string) => {
+    setCurrentRegenerateId(id);
+    setDialogOpen(true);
   };
 
-  const handleEditSave = () => {
-    if (editingId && editValues.id === editingId) {
-      setItems(
-        items.map((item) => (item.id === editingId ? { ...item, ...editValues } : item))
-      );
-      setEditingId(null);
-      setEditValues({});
-      toast.success("Item updated successfully");
+  const handleRegenerateSubmit = () => {
+    if (!currentRegenerateId) return;
+
+    setRegeneratingId(currentRegenerateId);
+    regenerateItem.mutate({
+      itemId: currentRegenerateId,
+      instructions: regenerateInstructions || undefined,
+    });
+  };
+
+  const handleContinue = () => {
+    if (selectedItemIds.length === 0) {
+      toast.error("Please select at least one item to continue");
+      return;
     }
+    window.location.href = `/content-package?runId=${runId}`;
   };
 
-  const handleRegenerate = async (id: number) => {
-    // TODO: Call API to regenerate item
-    setItems(
-      items.map((item) => (item.id === id ? { ...item, isRegenerating: true } : item))
+  // Sync selectedItemIds with items from backend
+  useEffect(() => {
+    if (items.length > 0) {
+      setSelectedItemIds(items.filter((item) => item.isSelected).map((item) => item.id));
+    }
+  }, [items]);
+
+  if (!runId) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No run ID provided. Please start a new run from the dashboard.
+          </AlertDescription>
+        </Alert>
+      </div>
     );
+  }
 
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setItems(
-        items.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                isRegenerating: false,
-                hook: "Updated hook from LLM regeneration",
-                summary: "Updated summary from LLM regeneration with improved content...",
-              }
-            : item
-        )
-      );
-      toast.success("Item regenerated successfully");
-    } catch (error) {
-      toast.error("Failed to regenerate item");
-      setItems(
-        items.map((item) => (item.id === id ? { ...item, isRegenerating: false } : item))
-      );
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load compiled items: {error.message}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No compiled items found. Please compile headlines first.
+          </AlertDescription>
+        </Alert>
+        <div className="mt-4">
+          <Link href={`/run?runId=${runId}`}>
+            <Button>Back to News Inbox</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="container mx-auto py-8 space-y-6">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-border">
-        <h1 className="text-3xl font-bold text-foreground">Compilation Review</h1>
-        <p className="text-muted-foreground mt-1">
-          {items.length} compiled items • {selectedCount} selected for content package
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Compilation Review</h1>
+          <p className="text-muted-foreground mt-1">
+            Review AI-compiled items and select those for content generation
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {selectedItemIds.length} / {items.length} Selected
+          </Badge>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="space-y-6">
-          {/* Info Box */}
-          <Card className="bg-accent/10 border-accent/20">
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <Zap className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-                <div>
-                  <CardTitle className="text-base text-accent">AI-Powered Compilation</CardTitle>
-                  <CardDescription className="text-accent/80 mt-1">
-                    These items were automatically compiled and homologated from your selected headlines. Review, edit, and select the ones you want to turn into YouTube content.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+      {/* Actions Bar */}
+      <div className="flex items-center justify-between bg-card border rounded-lg p-4">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={handleSelectAll}>
+            {selectedItemIds.length === items.length ? "Deselect All" : "Select All"}
+          </Button>
+        </div>
+        <Button
+          onClick={handleContinue}
+          disabled={selectedItemIds.length === 0}
+          className="gap-2"
+        >
+          Continue to Content Package
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
 
-          {/* Select All Button */}
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              {items.length} items available
-            </p>
-            <Button
-              variant="outline"
-              onClick={handleSelectAll}
-              className="border-border hover:bg-muted"
+      {/* Compiled Items List */}
+      <div className="space-y-4">
+        {items
+          .sort((a, b) => (b.heatScore || 0) - (a.heatScore || 0))
+          .map((item) => (
+            <Card
+              key={item.id}
+              className={`transition-all ${
+                selectedItemIds.includes(item.id)
+                  ? "border-primary bg-primary/5"
+                  : "hover:border-primary/50"
+              }`}
             >
-              {items.every((item) => item.selected) ? "Deselect All" : "Select All"}
-            </Button>
-          </div>
-
-          {/* Compiled Items */}
-          <div className="space-y-4">
-            {items.map((item) => (
-              <Card
-                key={item.id}
-                className={`bg-card border-border transition-all ${
-                  item.selected ? "border-accent bg-accent/5 shadow-md" : "hover:border-muted-foreground"
-                }`}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex gap-4">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3 flex-1">
                     <Checkbox
-                      checked={item.selected}
-                      onChange={() => handleSelectItem(item.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-1 flex-shrink-0"
+                      checked={selectedItemIds.includes(item.id)}
+                      onCheckedChange={() => handleSelectItem(item.id)}
+                      className="mt-1"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <CardTitle className="text-lg">{item.topic}</CardTitle>
-                        <Badge variant="outline" className="border-muted-foreground text-muted-foreground flex-shrink-0">
-                          {item.sourceCount} sources
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CardTitle className="text-xl">{item.topic}</CardTitle>
+                        <Badge variant="outline" className="gap-1">
+                          <Zap className="h-3 w-3" />
+                          {item.heatScore || 1} {item.heatScore === 1 ? "source" : "sources"}
                         </Badge>
                       </div>
-                      <p className="text-sm font-medium text-accent mb-2">{item.hook}</p>
-                      <CardDescription className="line-clamp-2 text-muted-foreground">
-                        {item.summary}
+                      <CardDescription className="text-base font-medium text-foreground">
+                        {item.hook}
                       </CardDescription>
                     </div>
                   </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {editingId === item.id ? (
-                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
-                      <div>
-                        <Label htmlFor={`hook-${item.id}`} className="text-sm font-medium text-foreground mb-2 block">
-                          Hook
-                        </Label>
-                        <Input
-                          id={`hook-${item.id}`}
-                          value={editValues.hook || ""}
-                          onChange={(e) => setEditValues({ ...editValues, hook: e.target.value })}
-                          className="bg-input border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`summary-${item.id}`} className="text-sm font-medium text-foreground mb-2 block">
-                          Summary
-                        </Label>
-                        <Textarea
-                          id={`summary-${item.id}`}
-                          value={editValues.summary || ""}
-                          onChange={(e) => setEditValues({ ...editValues, summary: e.target.value })}
-                          className="bg-input border-border min-h-24"
-                        />
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          onClick={() => setEditingId(null)}
-                          className="border-border hover:bg-muted"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleEditSave}
-                          className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2 justify-end">
+                  <Dialog open={dialogOpen && currentRegenerateId === item.id} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleRegenerate(item.id)}
-                        disabled={item.isRegenerating}
-                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => handleRegenerateClick(item.id)}
+                        disabled={regeneratingId === item.id}
+                        className="gap-2"
                       >
-                        {item.isRegenerating ? (
+                        {regeneratingId === item.id ? (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                             Regenerating...
                           </>
                         ) : (
                           <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
+                            <RefreshCw className="h-4 w-4" />
                             Regenerate
                           </>
                         )}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditStart(item)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <Edit2 className="w-4 h-4 mr-2" />
-                        Edit
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Regenerate Content</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Provide instructions for regenerating this item (optional):
+                          </p>
+                          <Textarea
+                            placeholder="e.g., Make it more concise, focus on technical details, use a casual tone..."
+                            value={regenerateInstructions}
+                            onChange={(e) => setRegenerateInstructions(e.target.value)}
+                            rows={4}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setDialogOpen(false);
+                            setRegenerateInstructions("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleRegenerateSubmit}>
+                          Regenerate
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <p className="text-muted-foreground whitespace-pre-wrap">{item.summary}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
       </div>
 
-      {/* Footer Actions */}
-      <div className="px-8 py-6 border-t border-border flex justify-between items-center gap-4 flex-wrap">
-        <Button variant="outline" className="border-border hover:bg-muted">
-          Back to Inbox
-        </Button>
-        <Link href="/content">
-          <Button
-            disabled={selectedCount === 0}
-            className="bg-accent hover:bg-accent/90 text-accent-foreground"
-          >
-            Create Content Package ({selectedCount})
-            <ChevronRight className="w-4 h-4 ml-2" />
-          </Button>
+      {/* Bottom Action Bar */}
+      <div className="flex items-center justify-between bg-card border rounded-lg p-4 sticky bottom-4">
+        <Link href={`/run?runId=${runId}`}>
+          <Button variant="outline">Back to News Inbox</Button>
         </Link>
+        <Button
+          onClick={handleContinue}
+          disabled={selectedItemIds.length === 0}
+          className="gap-2"
+        >
+          Continue to Content Package
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

@@ -307,3 +307,11 @@
 - [ ] Update runs router to trigger compilation after headline collection
 - [ ] Connect Compilation Review page to display real compiled items
 - [ ] Test compilation with real headlines from multiple sources
+
+## Current Task: Connect Compilation Page to Backend
+- [x] Update Compilation.tsx to use trpc.compilation.getCompiledItems
+- [x] Display real compiled items with topics, hooks, and summaries
+- [x] Implement regenerate functionality with custom instructions dialog
+- [x] Add selection persistence with trpc.compilation.updateSelection
+- [x] Show heat scores and source headline counts
+- [ ] Test compilation workflow end-to-end
