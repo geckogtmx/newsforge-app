@@ -29,7 +29,7 @@ export type InsertUser = typeof users.$inferInsert;
 // NewsForge Tables
 
 export const newsSources = mysqlTable("newsSources", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 64 }).primaryKey(),
   userId: int("userId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["rss", "gmail", "youtube", "website"]).notNull(),
@@ -44,7 +44,7 @@ export type NewsSource = typeof newsSources.$inferSelect;
 export type InsertNewsSource = typeof newsSources.$inferInsert;
 
 export const runs = mysqlTable("runs", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 64 }).primaryKey(),
   userId: int("userId").notNull(),
   status: mysqlEnum("status", ["draft", "collecting", "compiling", "reviewing", "completed", "archived"]).default("draft").notNull(),
   startedAt: timestamp("startedAt").defaultNow().notNull(),
@@ -59,8 +59,8 @@ export type InsertRun = typeof runs.$inferInsert;
 
 export const rawHeadlines = mysqlTable("rawHeadlines", {
   id: int("id").autoincrement().primaryKey(),
-  runId: int("runId").notNull(),
-  sourceId: int("sourceId").notNull(),
+  runId: varchar("runId", { length: 64 }).notNull(),
+  sourceId: varchar("sourceId", { length: 64 }).notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
   url: varchar("url", { length: 2048 }).notNull(),
@@ -75,7 +75,7 @@ export type InsertRawHeadline = typeof rawHeadlines.$inferInsert;
 
 export const compiledItems = mysqlTable("compiledItems", {
   id: int("id").autoincrement().primaryKey(),
-  runId: int("runId").notNull(),
+  runId: varchar("runId", { length: 64 }).notNull(),
   topic: varchar("topic", { length: 255 }).notNull(),
   hook: varchar("hook", { length: 500 }).notNull(),
   summary: text("summary").notNull(),
@@ -90,7 +90,7 @@ export type InsertCompiledItem = typeof compiledItems.$inferInsert;
 
 export const contentPackages = mysqlTable("contentPackages", {
   id: int("id").autoincrement().primaryKey(),
-  runId: int("runId").notNull(),
+  runId: varchar("runId", { length: 64 }).notNull(),
   compiledItemId: int("compiledItemId").notNull(),
   youtubeTitle: varchar("youtubeTitle", { length: 100 }),
   youtubeDescription: text("youtubeDescription"),
@@ -105,7 +105,7 @@ export type InsertContentPackage = typeof contentPackages.$inferInsert;
 
 export const runArchives = mysqlTable("runArchives", {
   id: int("id").autoincrement().primaryKey(),
-  runId: int("runId").notNull(),
+  runId: varchar("runId", { length: 64 }).notNull(),
   userId: int("userId").notNull(),
   archivedData: json("archivedData").notNull(), // Full run data snapshot
   obsidianExportPath: varchar("obsidianExportPath", { length: 2048 }),

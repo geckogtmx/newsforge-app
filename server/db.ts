@@ -121,13 +121,13 @@ export async function createNewsSource(data: InsertNewsSource) {
   return result;
 }
 
-export async function updateNewsSource(id: number, data: Partial<InsertNewsSource>) {
+export async function updateNewsSource(id: string, data: Partial<InsertNewsSource>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(newsSources).set(data).where(eq(newsSources.id, id));
 }
 
-export async function deleteNewsSource(id: number) {
+export async function deleteNewsSource(id: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.delete(newsSources).where(eq(newsSources.id, id));
@@ -140,14 +140,14 @@ export async function createRun(data: InsertRun) {
   return result;
 }
 
-export async function getRun(id: number) {
+export async function getRunById(id: string) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(runs).where(eq(runs.id, id)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
-export async function updateRun(id: number, data: Partial<InsertRun>) {
+export async function updateRun(id: string, data: Partial<InsertRun>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(runs).set(data).where(eq(runs.id, id));
@@ -165,7 +165,7 @@ export async function createRawHeadline(data: InsertRawHeadline) {
   return db.insert(rawHeadlines).values(data);
 }
 
-export async function getRunHeadlines(runId: number) {
+export async function getRawHeadlines(runId: string) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(rawHeadlines).where(eq(rawHeadlines.runId, runId));
@@ -183,7 +183,7 @@ export async function createCompiledItem(data: InsertCompiledItem) {
   return db.insert(compiledItems).values(data);
 }
 
-export async function getCompiledItems(runId: number) {
+export async function getCompiledItems(runId: string) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(compiledItems).where(eq(compiledItems.runId, runId));
@@ -201,7 +201,7 @@ export async function createContentPackage(data: InsertContentPackage) {
   return db.insert(contentPackages).values(data);
 }
 
-export async function getContentPackages(runId: number) {
+export async function getContentPackages(runId: string) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(contentPackages).where(eq(contentPackages.runId, runId));

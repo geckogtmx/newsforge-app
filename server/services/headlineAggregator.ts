@@ -10,14 +10,14 @@ export interface AggregatedHeadline {
   url: string;
   publishedAt: Date;
   source: "rss" | "gmail" | "youtube" | "website" | "web";
-  sourceId?: number;
+  sourceId?: string;
   sourceType: string;
 }
 
 /**
  * Aggregate headlines from all configured sources for a user
  */
-export async function aggregateHeadlinesFromSources(
+export async function aggregateHeadlines(
   sources: NewsSource[]
 ): Promise<AggregatedHeadline[]> {
   const headlines: AggregatedHeadline[] = [];
