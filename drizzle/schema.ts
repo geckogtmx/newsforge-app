@@ -36,6 +36,16 @@ export const newsSources = mysqlTable("newsSources", {
   config: json("config").notNull(), // { url?, label?, channelId?, etc }
   topics: json("topics").notNull(), // Array of topic strings
   isActive: boolean("isActive").default(true).notNull(),
+  // Incremental run support
+  lastFetchedAt: timestamp("lastFetchedAt"),
+  // Quality scoring
+  selectionRate: int("selectionRate").default(0), // % of headlines selected for compilation (0-100)
+  finalRate: int("finalRate").default(0), // % that make it to content packages (0-100)
+  userRating: int("userRating").default(0), // User rating: -1 (down), 0 (neutral), 1 (up)
+  qualityScore: int("qualityScore").default(50), // Calculated quality score (0-100)
+  totalHeadlines: int("totalHeadlines").default(0), // Total headlines fetched
+  selectedHeadlines: int("selectedHeadlines").default(0), // Headlines selected for compilation
+  finalHeadlines: int("finalHeadlines").default(0), // Headlines in final content packages
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -49,7 +59,8 @@ export const runs = mysqlTable("runs", {
   status: mysqlEnum("status", ["draft", "collecting", "compiling", "reviewing", "completed", "archived"]).default("draft").notNull(),
   startedAt: timestamp("startedAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
-  stats: json("stats").notNull(), // { itemsCollected, itemsCompiled, tokensUsed, contentItemsCreated }
+  stats: json("stats").notNull(), // { itemsCollected, itemsCompiled, tokensUsed, contentItemsCreated, deduplicatedGroups, costEstimate, actualCost }
+  isIncremental: boolean("isIncremental").default(false).notNull(), // Whether this is an incremental run
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -67,6 +78,12 @@ export const rawHeadlines = mysqlTable("rawHeadlines", {
   publishedAt: timestamp("publishedAt"),
   source: mysqlEnum("source", ["rss", "gmail", "youtube", "website"]).notNull(),
   isSelected: boolean("isSelected").default(false).notNull(),
+  // Deduplication support
+  deduplicationGroupId: varchar("deduplicationGroupId", { length: 64 }), // Group ID for similar headlines
+  heatScore: int("heatScore").default(1), // Number of sources covering this story
+  isBestVersion: boolean("isBestVersion").default(false), // Best version in dedup group
+  // Keyword alerts
+  matchedKeywords: json("matchedKeywords"), // Array of matched keyword IDs
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -122,8 +139,41 @@ export const userSettings = mysqlTable("userSettings", {
   format: json("format").notNull(), // { structure, cadence }
   obsidianVaultPath: varchar("obsidianVaultPath", { length: 2048 }),
   llmModel: varchar("llmModel", { length: 100 }).default("claude-3.5-sonnet").notNull(),
+  // Budget and cost settings
+  monthlyBudget: int("monthlyBudget").default(0), // Monthly budget in cents (0 = no limit)
+  currentMonthSpend: int("currentMonthSpend").default(0), // Current month spend in cents
+  lastBudgetReset: timestamp("lastBudgetReset").defaultNow(),
+  // Incremental run preferences
+  defaultIncrementalMode: boolean("defaultIncrementalMode").default(true),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type InsertUserSettings = typeof userSettings.$inferInsert;
+
+// Keyword Alerts Table
+export const keywordAlerts = mysqlTable("keywordAlerts", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  keyword: varchar("keyword", { length: 255 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  notifyDesktop: boolean("notifyDesktop").default(true).notNull(),
+  autoTag: boolean("autoTag").default(true).notNull(),
+  matchCount: int("matchCount").default(0), // Total matches
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type KeywordAlert = typeof keywordAlerts.$inferSelect;
+export type InsertKeywordAlert = typeof keywordAlerts.$inferInsert;
+
+// Headline Embeddings Table (for semantic deduplication)
+export const headlineEmbeddings = mysqlTable("headlineEmbeddings", {
+  id: int("id").autoincrement().primaryKey(),
+  headlineId: int("headlineId").notNull(), // Foreign key to rawHeadlines
+  embedding: json("embedding").notNull(), // Vector embedding as JSON array
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HeadlineEmbedding = typeof headlineEmbeddings.$inferSelect;
+export type InsertHeadlineEmbedding = typeof headlineEmbeddings.$inferInsert;
