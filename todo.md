@@ -263,3 +263,16 @@
 - [ ] Set up deployment pipeline
 - [ ] Create deployment checklist
 - [ ] Prepare for production launch
+
+
+## Current Phase: Source Quality Scoring & Keyword Alerts
+- [x] Implement quality scoring service with calculation algorithm
+- [ ] Create tRPC procedures for quality score tracking and updates
+- [x] Create keyword alert service with matching algorithm
+- [x] Create tRPC procedures for keyword alert management (CRUD)
+- [x] Implement desktop notification service
+- [x] Build keyword alerts management UI page
+- [ ] Add quality score display to Sources page
+- [ ] Add keyword alert highlights to News Inbox
+- [ ] Test quality scoring with real data
+- [ ] Test keyword alerts and notifications

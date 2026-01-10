@@ -4,10 +4,14 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { sourcesRouter } from "./routers/sources";
 import { runsRouter } from "./routers/runs";
+import { alertsRouter } from "./routers/alerts";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  sources: sourcesRouter,
+  runs: runsRouter,
+  alerts: alertsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -18,10 +22,6 @@ export const appRouter = router({
       } as const;
     }),
   }),
-
-  // NewsForge routers
-  sources: sourcesRouter,
-  runs: runsRouter,
 });
 
 export type AppRouter = typeof appRouter;

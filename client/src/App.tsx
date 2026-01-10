@@ -12,6 +12,7 @@ import Archive from "./pages/Archive";
 import Settings from "./pages/Settings";
 import Compilation from "./pages/Compilation";
 import ContentPackage from "./pages/ContentPackage";
+import KeywordAlerts from "./pages/KeywordAlerts";
 
 function Router() {
   return (
@@ -49,6 +50,11 @@ function Router() {
       <Route path={"/content"}>
         <AppLayout>
           <ContentPackage />
+        </AppLayout>
+      </Route>
+      <Route path={"/alerts"}>
+        <AppLayout>
+          <KeywordAlerts />
         </AppLayout>
       </Route>
       <Route path={"/404"} component={NotFound} />

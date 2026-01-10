@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { LogOut, Home, Settings, Zap, Archive } from "lucide-react";
+import { LogOut, Home, Settings, Zap, Archive, Bell } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { ReactNode } from "react";
 
@@ -18,6 +18,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { path: "/", label: "Home", icon: Home },
     { path: "/sources", label: "Sources", icon: Zap },
     { path: "/run", label: "Run", icon: Zap },
+    { path: "/alerts", label: "Alerts", icon: Bell },
     { path: "/settings", label: "Settings", icon: Settings },
     { path: "/archive", label: "Archive", icon: Archive },
   ];
