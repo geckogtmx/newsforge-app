@@ -189,7 +189,7 @@ export async function getCompiledItems(runId: string) {
   return db.select().from(compiledItems).where(eq(compiledItems.runId, runId));
 }
 
-export async function updateCompiledItem(id: number, data: Partial<InsertCompiledItem>) {
+export async function updateCompiledItem(id: string, data: Partial<InsertCompiledItem>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(compiledItems).set(data).where(eq(compiledItems.id, id));
@@ -207,7 +207,7 @@ export async function getContentPackages(runId: string) {
   return db.select().from(contentPackages).where(eq(contentPackages.runId, runId));
 }
 
-export async function updateContentPackage(id: number, data: Partial<InsertContentPackage>) {
+export async function updateContentPackage(id: string, data: Partial<InsertContentPackage>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(contentPackages).set(data).where(eq(contentPackages.id, id));

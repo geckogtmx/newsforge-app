@@ -15,6 +15,13 @@
       "when": 1768086751752,
       "tag": "0001_outgoing_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1768088991386,
+      "tag": "0002_yummy_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

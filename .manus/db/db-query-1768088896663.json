@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE compiledItems ADD COLUMN IF NOT EXISTS heatScore INT DEFAULT 1 NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xKTS3Fn9noGSWk.root --database GBXpKwZYcju3ds6RsgiHLS --execute ALTER TABLE compiledItems ADD COLUMN IF NOT EXISTS heatScore INT DEFAULT 1 NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 409
+}

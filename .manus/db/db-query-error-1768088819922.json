@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE compiledItems MODIFY COLUMN id VARCHAR(64) PRIMARY KEY;\nALTER TABLE compiledItems ADD COLUMN heatScore INT DEFAULT 1 NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xKTS3Fn9noGSWk.root --database GBXpKwZYcju3ds6RsgiHLS --execute ALTER TABLE compiledItems MODIFY COLUMN id VARCHAR(64) PRIMARY KEY;\nALTER TABLE compiledItems ADD COLUMN heatScore INT DEFAULT 1 NOT NULL;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 8200 (HY000) at line 1: can't change column constraint (PRIMARY KEY)"
+  ]
+}

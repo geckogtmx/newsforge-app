@@ -91,12 +91,13 @@ export type RawHeadline = typeof rawHeadlines.$inferSelect;
 export type InsertRawHeadline = typeof rawHeadlines.$inferInsert;
 
 export const compiledItems = mysqlTable("compiledItems", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 64 }).primaryKey(),
   runId: varchar("runId", { length: 64 }).notNull(),
   topic: varchar("topic", { length: 255 }).notNull(),
   hook: varchar("hook", { length: 500 }).notNull(),
   summary: text("summary").notNull(),
   sourceHeadlineIds: json("sourceHeadlineIds").notNull(), // Array of RawHeadline IDs
+  heatScore: int("heatScore").default(1).notNull(),
   isSelected: boolean("isSelected").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -106,9 +107,9 @@ export type CompiledItem = typeof compiledItems.$inferSelect;
 export type InsertCompiledItem = typeof compiledItems.$inferInsert;
 
 export const contentPackages = mysqlTable("contentPackages", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 64 }).primaryKey(),
   runId: varchar("runId", { length: 64 }).notNull(),
-  compiledItemId: int("compiledItemId").notNull(),
+  compiledItemId: varchar("compiledItemId", { length: 64 }).notNull(),
   youtubeTitle: varchar("youtubeTitle", { length: 100 }),
   youtubeDescription: text("youtubeDescription"),
   scriptOutline: text("scriptOutline"),

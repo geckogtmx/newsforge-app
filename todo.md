@@ -290,3 +290,20 @@
 - [ ] Connect News Inbox to display real headlines from database
 - [ ] Add headline selection persistence to database
 - [ ] Test complete workflow from source creation to headline collection
+
+
+## Current Phase: AI Content Compilation
+- [x] Create AI compilation service using Manus LLM API
+- [x] Implement topic homologation algorithm to group similar headlines
+- [x] Integrate smart deduplication engine into compilation workflow
+- [x] Generate hooks (short descriptions) for each compiled item
+- [x] Generate extended summaries for each compiled item
+- [x] Create tRPC procedure for compileHeadlines
+- [x] Create tRPC procedure for getCompiledItems
+- [x] Create tRPC procedure for regenerateItem
+- [x] Create tRPC procedure for updateSelection
+- [x] Add compilation router to main appRouter
+- [x] Fix database schema to use string IDs for compiledItems and contentPackages
+- [ ] Update runs router to trigger compilation after headline collection
+- [ ] Connect Compilation Review page to display real compiled items
+- [ ] Test compilation with real headlines from multiple sources
