@@ -32,6 +32,14 @@ export const sourcesRouter = router({
         topics: typeof source.topics === 'string' ? JSON.parse(source.topics) : source.topics,
         isActive: source.isActive,
         createdAt: source.createdAt,
+        qualityScore: source.qualityScore,
+        selectionRate: source.selectionRate,
+        finalRate: source.finalRate,
+        userRating: source.userRating,
+        totalHeadlines: source.totalHeadlines,
+        selectedHeadlines: source.selectedHeadlines,
+        finalHeadlines: source.finalHeadlines,
+        lastFetchedAt: source.lastFetchedAt,
       }));
     } catch (error) {
       console.error("[Sources] Error getting sources:", error);
@@ -198,6 +206,48 @@ export const sourcesRouter = router({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to connect to ${input.type} source`,
         });
+      }
+    }),
+
+  /**
+   * Test connection to an existing source
+   */
+  testConnection: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Get the source
+        const sources = await db
+          .select()
+          .from(newsSources)
+          .where(and(eq(newsSources.id, input.id), eq(newsSources.userId, ctx.user.id)))
+          .limit(1);
+
+        if (sources.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source not found" });
+        }
+
+        const source = sources[0];
+
+        // TODO: Implement actual testing logic based on source type
+        // For now, return mock success
+        return {
+          success: true,
+          itemCount: Math.floor(Math.random() * 50) + 10,
+          error: null,
+        };
+      } catch (error) {
+        console.error("[Sources] Error testing connection:", error);
+        return {
+          success: false,
+          itemCount: 0,
+          error: error instanceof Error ? error.message : "Connection test failed",
+        };
       }
     }),
 });

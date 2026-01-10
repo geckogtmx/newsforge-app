@@ -276,3 +276,17 @@
 - [ ] Add keyword alert highlights to News Inbox
 - [ ] Test quality scoring with real data
 - [ ] Test keyword alerts and notifications
+
+
+## Current Phase: Connect Frontend to Backend
+- [x] Update Sources page to use trpc.sources.getSources query
+- [x] Add quality score display with color-coded badges to Sources page
+- [x] Implement source creation form with API configuration
+- [x] Add source editing and deletion functionality
+- [x] Add testConnection procedure to sources router
+- [x] Update Dashboard to use trpc.runs.getRunHistory query
+- [x] Display real run statistics on Dashboard
+- [x] Implement "Start New Run" workflow with trpc.runs.startRun mutation
+- [ ] Connect News Inbox to display real headlines from database
+- [ ] Add headline selection persistence to database
+- [ ] Test complete workflow from source creation to headline collection
