@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X, Flame, ChevronDown, ChevronUp } from "lucide-react";
+import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X, Flame, ChevronDown, ChevronUp, DollarSign, Info } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -46,14 +46,22 @@ export default function NewsInbox() {
   const [deduplicationGroups, setDeduplicationGroups] = useState<DeduplicationGroup[]>([]);
   const [showDeduplication, setShowDeduplication] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showCostEstimate, setShowCostEstimate] = useState(false);
+  const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
 
   // Get current run
   const { data: currentRun, isLoading: isLoadingRun } = trpc.runs.getCurrentRun.useQuery();
 
   // Get headlines for current run
   const { data: headlinesData, isLoading: isLoadingHeadlines } = trpc.runs.getHeadlines.useQuery(
-    { runId: currentRunId! },
+    { runId: currentRunId || "" },
     { enabled: !!currentRunId }
+  );
+
+  // Get cost estimate for selected headlines
+  const { data: costEstimate, isLoading: isLoadingCost, refetch: refetchCost } = trpc.compilation.estimateCost.useQuery(
+    { runId: currentRunId || "" },
+    { enabled: false } // Only fetch when user requests
   );
 
   // Start new run mutation
@@ -165,6 +173,22 @@ export default function NewsInbox() {
     setSelectedCount(newCount);
   };
 
+  const handleShowCostEstimate = async () => {
+    if (!currentRunId) {
+      toast.error("No active run");
+      return;
+    }
+
+    if (selectedCount === 0) {
+      toast.error("Please select headlines first");
+      return;
+    }
+
+    setShowCostEstimate(true);
+    await refetchCost();
+    setCostEstimateDialogOpen(true);
+  };
+
   const handleContinueToCompile = () => {
     if (!currentRunId) {
       toast.error("No active run");
@@ -181,6 +205,11 @@ export default function NewsInbox() {
       runId: currentRunId,
       headlineIds: selectedIds,
     });
+  };
+
+  const handleProceedToCompile = () => {
+    setCostEstimateDialogOpen(false);
+    handleContinueToCompile();
   };
 
   const handleBroaderSearch = async () => {
@@ -594,25 +623,115 @@ export default function NewsInbox() {
               <span>Select headlines to continue</span>
             )}
           </div>
-          <Button
-            onClick={handleContinueToCompile}
-            disabled={selectedCount === 0 || updateSelectionMutation.isPending}
-            className="gap-2"
-          >
-            {updateSelectionMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                Continue to Compile ({selectedCount})
-                <ChevronRight className="w-4 h-4" />
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleShowCostEstimate}
+              disabled={selectedCount === 0}
+              className="gap-2 border-border"
+            >
+              <DollarSign className="w-4 h-4" />
+              Estimate Cost
+            </Button>
+            <Button
+              onClick={handleContinueToCompile}
+              disabled={selectedCount === 0 || updateSelectionMutation.isPending}
+              className="gap-2"
+            >
+              {updateSelectionMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Continue to Compile ({selectedCount})
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Cost Estimate Dialog */}
+      <Dialog open={costEstimateDialogOpen} onOpenChange={setCostEstimateDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-accent" />
+              Cost Estimate
+            </DialogTitle>
+          </DialogHeader>
+          {isLoadingCost ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
+            </div>
+          ) : costEstimate ? (
+            <div className="space-y-4 mt-4">
+              <div className="bg-accent/5 border border-accent/20 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Estimated Cost</span>
+                  <span className="text-2xl font-bold text-accent">
+                    ${costEstimate.estimatedCost.toFixed(4)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estimated Tokens</span>
+                  <span className="text-sm font-medium">
+                    {costEstimate.estimatedTokens.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {costEstimate.breakdown && costEstimate.breakdown.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-foreground">Cost Breakdown</h4>
+                  {costEstimate.breakdown.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.operation}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.tokens.toLocaleString()} tokens
+                        </p>
+                      </div>
+                      <span className="text-sm font-medium">${item.cost.toFixed(4)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  This is an estimate based on average token usage. Actual costs may vary depending on content complexity.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCostEstimateDialogOpen(false)}
+                  className="flex-1 border-border"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleProceedToCompile}
+                  disabled={updateSelectionMutation.isPending}
+                  className="flex-1"
+                >
+                  Proceed to Compile
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>Unable to estimate cost. Please try again.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

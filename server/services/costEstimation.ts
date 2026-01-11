@@ -130,12 +130,13 @@ export function estimateCompilationCost(
  */
 export function estimateYouTubeAssetCost(
   compiledItemCount: number,
+  averageItemLength: number = 400,
   model: string = DEFAULT_MODEL
 ): CostEstimate {
   const breakdown: CostEstimate["breakdown"] = [];
   
   // For each compiled item, generate title, description, and script
-  const inputTokensPerItem = estimateTokens("System prompt + topic + hook + summary") + 800;
+  const inputTokensPerItem = estimateTokens("System prompt for YouTube asset generation") + estimateTokens("A".repeat(averageItemLength));
   const outputTokensPerItem = 
     estimateTokens("A".repeat(60)) + // Title
     estimateTokens("A".repeat(300)) + // Description
@@ -146,9 +147,21 @@ export function estimateYouTubeAssetCost(
   const totalCost = calculateCost(totalInputTokens, totalOutputTokens, model);
   
   breakdown.push({
-    operation: "YouTube Assets",
-    tokens: totalInputTokens + totalOutputTokens,
-    cost: totalCost,
+    operation: "YouTube Title Generation",
+    tokens: Math.ceil((inputTokensPerItem + estimateTokens("A".repeat(60))) * compiledItemCount),
+    cost: calculateCost(inputTokensPerItem * compiledItemCount, estimateTokens("A".repeat(60)) * compiledItemCount, model),
+  });
+  
+  breakdown.push({
+    operation: "YouTube Description Generation",
+    tokens: Math.ceil((inputTokensPerItem + estimateTokens("A".repeat(300))) * compiledItemCount),
+    cost: calculateCost(inputTokensPerItem * compiledItemCount, estimateTokens("A".repeat(300)) * compiledItemCount, model),
+  });
+  
+  breakdown.push({
+    operation: "Script Outline Generation",
+    tokens: Math.ceil((inputTokensPerItem + estimateTokens("A".repeat(500))) * compiledItemCount),
+    cost: calculateCost(inputTokensPerItem * compiledItemCount, estimateTokens("A".repeat(500)) * compiledItemCount, model),
   });
   
   return {
@@ -212,7 +225,7 @@ export function estimateFullRunCost(
   
   // YouTube assets (assume 1/3 of headlines become compiled items)
   const estimatedCompiledItems = Math.ceil(headlineCount / 3);
-  const youtubeEstimate = estimateYouTubeAssetCost(estimatedCompiledItems, model);
+  const youtubeEstimate = estimateYouTubeAssetCost(estimatedCompiledItems, 400, model);
   breakdown.push(...youtubeEstimate.breakdown);
   totalTokens += youtubeEstimate.estimatedTokens;
   totalCost += youtubeEstimate.estimatedCost;

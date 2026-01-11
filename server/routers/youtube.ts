@@ -5,9 +5,101 @@ import { eq, and, inArray } from "drizzle-orm";
 import { compiledItems, contentPackages, userSettings } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { generateYouTubeAssets, regenerateYouTubeAsset } from "../services/youtubeAssetGeneration";
+import { estimateYouTubeAssetCost } from "../services/costEstimation";
 import { nanoid } from "nanoid";
+import { runs } from "../../drizzle/schema";
 
 export const youtubeRouter = router({
+  /**
+   * Estimate cost for YouTube asset generation
+   */
+  estimateCost: protectedProcedure
+    .input(
+      z.object({
+        runId: z.string(),
+        itemIds: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify run belongs to user
+        const runRecords = await db
+          .select()
+          .from(runs)
+          .where(and(eq(runs.id, input.runId), eq(runs.userId, ctx.user.id)))
+          .limit(1);
+
+        if (runRecords.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Run not found" });
+        }
+
+        // Get compiled items to estimate
+        let itemsToEstimate;
+        if (input.itemIds && input.itemIds.length > 0) {
+          itemsToEstimate = await db
+            .select()
+            .from(compiledItems)
+            .where(
+              and(
+                eq(compiledItems.runId, input.runId),
+                inArray(compiledItems.id, input.itemIds)
+              )
+            );
+        } else {
+          itemsToEstimate = await db
+            .select()
+            .from(compiledItems)
+            .where(and(eq(compiledItems.runId, input.runId), eq(compiledItems.isSelected, true)));
+        }
+
+        if (itemsToEstimate.length === 0) {
+          return {
+            estimatedTokens: 0,
+            estimatedCost: 0,
+            breakdown: [],
+          };
+        }
+
+        // Calculate average item length
+        const totalLength = itemsToEstimate.reduce(
+          (sum, item) => sum + (item.hook?.length || 0) + (item.summary?.length || 0),
+          0
+        );
+        const avgLength = Math.ceil(totalLength / itemsToEstimate.length);
+
+        // Get user's selected model
+        const settingsRecords = await db
+          .select()
+          .from(userSettings)
+          .where(eq(userSettings.userId, ctx.user.id))
+          .limit(1);
+
+        const model = settingsRecords[0]?.llmModel
+          ? String(settingsRecords[0].llmModel)
+          : "gpt-4.1-mini";
+
+        // Estimate cost
+        const estimate = estimateYouTubeAssetCost(
+          itemsToEstimate.length,
+          avgLength,
+          model
+        );
+
+        return estimate;
+      } catch (error) {
+        console.error("[YouTube] Error estimating cost:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to estimate cost",
+        });
+      }
+    }),
+
   /**
    * Generate YouTube assets for selected compiled items
    */

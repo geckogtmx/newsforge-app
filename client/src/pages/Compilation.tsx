@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, Edit2, RefreshCw, Loader2, Zap, AlertCircle } from "lucide-react";
+import { ChevronRight, Edit2, RefreshCw, Loader2, Zap, AlertCircle, DollarSign, Info } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -21,11 +21,18 @@ export default function Compilation() {
   const [regenerateInstructions, setRegenerateInstructions] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentRegenerateId, setCurrentRegenerateId] = useState<string | null>(null);
+  const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
 
   // Fetch compiled items for this run
   const { data: items = [], isLoading, error, refetch } = trpc.compilation.getCompiledItems.useQuery(
     { runId },
     { enabled: !!runId }
+  );
+
+  // Get cost estimate for YouTube asset generation
+  const { data: costEstimate, isLoading: isLoadingCost, refetch: refetchCost } = trpc.youtube.estimateCost.useQuery(
+    { runId },
+    { enabled: false } // Only fetch when user requests
   );
 
   const updateSelection = trpc.compilation.updateSelection.useMutation({
@@ -93,12 +100,27 @@ export default function Compilation() {
     });
   };
 
+  const handleShowCostEstimate = async () => {
+    if (selectedItemIds.length === 0) {
+      toast.error("Please select items first");
+      return;
+    }
+
+    await refetchCost();
+    setCostEstimateDialogOpen(true);
+  };
+
   const handleContinue = () => {
     if (selectedItemIds.length === 0) {
       toast.error("Please select at least one item to continue");
       return;
     }
     window.location.href = `/content-package?runId=${runId}`;
+  };
+
+  const handleProceedToGenerate = () => {
+    setCostEstimateDialogOpen(false);
+    handleContinue();
   };
 
   // Sync selectedItemIds with items from backend
@@ -297,19 +319,108 @@ export default function Compilation() {
       </div>
 
       {/* Bottom Action Bar */}
-      <div className="flex items-center justify-between bg-card border rounded-lg p-4 sticky bottom-4">
+      <div className="flex items-      <div className="flex items-center justify-between p-6 border-t">
         <Link href={`/run?runId=${runId}`}>
           <Button variant="outline">Back to News Inbox</Button>
         </Link>
-        <Button
-          onClick={handleContinue}
-          disabled={selectedItemIds.length === 0}
-          className="gap-2"
-        >
-          Continue to Content Package
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleShowCostEstimate}
+            disabled={selectedItemIds.length === 0}
+            className="gap-2"
+          >
+            <DollarSign className="w-4 h-4" />
+            Estimate Cost
+          </Button>
+          <Button
+            onClick={handleContinue}
+            disabled={selectedItemIds.length === 0}
+            className="gap-2"
+          >
+            Continue to Content Package
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Cost Estimate Dialog */}
+      <Dialog open={costEstimateDialogOpen} onOpenChange={setCostEstimateDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-accent" />
+              YouTube Asset Generation Cost
+            </DialogTitle>
+          </DialogHeader>
+          {isLoadingCost ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
+            </div>
+          ) : costEstimate ? (
+            <div className="space-y-4 mt-4">
+              <div className="bg-accent/5 border border-accent/20 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Estimated Cost</span>
+                  <span className="text-2xl font-bold text-accent">
+                    ${costEstimate.estimatedCost.toFixed(4)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estimated Tokens</span>
+                  <span className="text-sm font-medium">
+                    {costEstimate.estimatedTokens.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {costEstimate.breakdown && costEstimate.breakdown.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-foreground">Cost Breakdown</h4>
+                  {costEstimate.breakdown.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.operation}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.tokens.toLocaleString()} tokens
+                        </p>
+                      </div>
+                      <span className="text-sm font-medium">${item.cost.toFixed(4)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  This estimate covers YouTube title, description, and script outline generation for {selectedItemIds.length} {selectedItemIds.length === 1 ? 'item' : 'items'}.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCostEstimateDialogOpen(false)}
+                  className="flex-1 border-border"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleProceedToGenerate}
+                  className="flex-1"
+                >
+                  Proceed to Generate
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>Unable to estimate cost. Please try again.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
