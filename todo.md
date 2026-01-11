@@ -315,3 +315,20 @@
 - [x] Add selection persistence with trpc.compilation.updateSelection
 - [x] Show heat scores and source headline counts
 - [ ] Test compilation workflow end-to-end
+
+
+## Current Task: YouTube Asset Generation
+- [x] Create YouTube asset generation service using Manus LLM API
+- [x] Implement title generation (catchy, SEO-optimized, under 100 chars)
+- [x] Implement description generation (detailed, with timestamps, links)
+- [x] Implement script outline generation (intro, main points, outro)
+- [x] Create tRPC router for YouTube asset generation
+- [x] Add generateAssets procedure
+- [x] Add regenerateAsset procedure for individual assets
+- [x] Add updateAsset procedure for manual editing
+- [x] Add markReady procedure for export status
+- [x] Connect Content Package page to backend
+- [x] Display generated YouTube assets with inline editing
+- [x] Add copy-to-clipboard functionality
+- [x] Add regenerate dialog with custom instructions
+- [ ] Test YouTube asset generation end-to-end

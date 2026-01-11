@@ -1,372 +1,490 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Edit2, Copy, Download, Loader2, Play, FileText } from "lucide-react";
-import { Link } from "wouter";
+import { ChevronRight, Copy, Loader2, FileText, RefreshCw, AlertCircle, Check } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
-
-interface ContentAsset {
-  id: number;
-  topic: string;
-  youtubeTitle: string;
-  youtubeDescription: string;
-  scriptOutline: string;
-  status: "generated" | "editing" | "finalized";
-  isRegenerating?: boolean;
-}
+import { trpc } from "@/lib/trpc";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ContentPackage() {
-  const [assets, setAssets] = useState<ContentAsset[]>([
-    {
-      id: 1,
-      topic: "GPT-5 Release",
-      youtubeTitle: "OpenAI's GPT-5: The AI Revolution Continues",
-      youtubeDescription:
-        "OpenAI has just released GPT-5, featuring groundbreaking multimodal capabilities. In this video, we break down what makes GPT-5 special, how it compares to GPT-4, and what it means for the future of AI.\n\n⏱️ Timestamps:\n0:00 - Introduction\n0:45 - What is GPT-5?\n2:30 - Key Features\n5:00 - Performance Benchmarks\n7:15 - Real-world Applications\n9:30 - Conclusion\n\n📚 Resources:\n- OpenAI Blog: [link]\n- Technical Paper: [link]",
-      scriptOutline:
-        "1. Hook (0-5s): Start with impressive GPT-5 demo\n2. What is GPT-5 (45s-2:30): Explain multimodal capabilities\n3. Key Features (2:30-5:00): Deep dive into new features\n4. Performance (5:00-7:15): Show benchmark comparisons\n5. Applications (7:15-9:30): Real-world use cases\n6. Conclusion (9:30-10:00): Call to action and subscribe",
-      status: "generated",
+  const [location] = useLocation();
+  const searchParams = new URLSearchParams(location.split("?")[1]);
+  const runId = searchParams.get("runId") || "";
+
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const [regeneratingAsset, setRegeneratingAsset] = useState<{
+    packageId: string;
+    assetType: "title" | "description" | "scriptOutline";
+  } | null>(null);
+  const [regenerateInstructions, setRegenerateInstructions] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  // Fetch content packages for this run
+  const { data: packages = [], isLoading, error, refetch } = trpc.youtube.getPackages.useQuery(
+    { runId },
+    { enabled: !!runId }
+  );
+
+  const generateAssets = trpc.youtube.generateAssets.useMutation({
+    onSuccess: () => {
+      toast.success("YouTube assets generated successfully");
+      refetch();
+      setGenerating(false);
     },
-    {
-      id: 2,
-      topic: "AI Funding Surge",
-      youtubeTitle: "AI Companies Raise $100B+ in 2026 - What's Happening?",
-      youtubeDescription:
-        "The AI funding landscape is exploding. Anthropic just raised $5B, and the total AI funding for 2026 is projected to exceed $100B. We explore what's driving this investment surge and what it means for the future of AI development.\n\n⏱️ Timestamps:\n0:00 - Introduction\n0:30 - The Numbers\n2:00 - Anthropic's Funding\n4:00 - Why the Surge?\n6:30 - Market Implications\n8:00 - Conclusion",
-      scriptOutline:
-        "1. Hook (0-5s): Show funding statistics\n2. The Numbers (30s-2:00): Explain funding trends\n3. Anthropic Case (2:00-4:00): Focus on their $5B raise\n4. Why Surge (4:00-6:30): Market drivers and competition\n5. Implications (6:30-8:00): What this means for AI\n6. Conclusion (8:00-8:30): Summary and call to action",
-      status: "generated",
+    onError: (error) => {
+      toast.error(`Failed to generate assets: ${error.message}`);
+      setGenerating(false);
     },
-    {
-      id: 3,
-      topic: "Open Source AI",
-      youtubeTitle: "Meta's Open-Source AI Models: A Game Changer",
-      youtubeDescription:
-        "Meta is democratizing AI by releasing open-source models. Learn how this move could reshape the AI landscape and what it means for developers and researchers worldwide.",
-      scriptOutline:
-        "1. Hook (0-5s): Show Meta announcement\n2. What's Being Released (30s-2:00): Overview of models\n3. Why It Matters (2:00-5:00): Impact on AI community\n4. How to Use (5:00-7:00): Getting started guide\n5. Implications (7:00-9:00): Future of open-source AI\n6. Conclusion (9:00-10:00): Call to action",
-      status: "generated",
-    },
-  ]);
+  });
 
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValues, setEditValues] = useState<Partial<ContentAsset>>({});
-  const [selectedAsset, setSelectedAsset] = useState<ContentAsset | null>(assets[0]);
-
-  const handleEditStart = (asset: ContentAsset) => {
-    setEditingId(asset.id);
-    setEditValues({ ...asset });
-  };
-
-  const handleEditSave = () => {
-    if (editingId && editValues.id === editingId) {
-      setAssets(
-        assets.map((asset) => (asset.id === editingId ? { ...asset, ...editValues } : asset))
-      );
-      if (selectedAsset?.id === editingId) {
-        setSelectedAsset({ ...selectedAsset, ...editValues });
-      }
-      setEditingId(null);
-      setEditValues({});
-      toast.success("Asset updated successfully");
-    }
-  };
-
-  const handleRegenerate = async (id: number) => {
-    setAssets(
-      assets.map((asset) => (asset.id === id ? { ...asset, isRegenerating: true } : asset))
-    );
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setAssets(
-        assets.map((asset) =>
-          asset.id === id
-            ? {
-                ...asset,
-                isRegenerating: false,
-                youtubeTitle: "Updated Title from LLM",
-                youtubeDescription: "Updated description from LLM regeneration...",
-                scriptOutline: "Updated script outline from LLM...",
-              }
-            : asset
-        )
-      );
+  const regenerateAsset = trpc.youtube.regenerateAsset.useMutation({
+    onSuccess: () => {
       toast.success("Asset regenerated successfully");
-    } catch (error) {
-      toast.error("Failed to regenerate asset");
-      setAssets(
-        assets.map((asset) => (asset.id === id ? { ...asset, isRegenerating: false } : asset))
-      );
-    }
+      refetch();
+      setRegeneratingAsset(null);
+      setDialogOpen(false);
+      setRegenerateInstructions("");
+    },
+    onError: (error) => {
+      toast.error(`Failed to regenerate: ${error.message}`);
+      setRegeneratingAsset(null);
+    },
+  });
+
+  const updateAsset = trpc.youtube.updateAsset.useMutation({
+    onSuccess: () => {
+      toast.success("Asset updated");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update: ${error.message}`);
+    },
+  });
+
+  const handleGenerateAssets = () => {
+    setGenerating(true);
+    generateAssets.mutate({ runId });
   };
 
-  const handleCopy = (text: string) => {
+  const handleRegenerateClick = (packageId: string, assetType: "title" | "description" | "scriptOutline") => {
+    setRegeneratingAsset({ packageId, assetType });
+    setDialogOpen(true);
+  };
+
+  const handleRegenerateSubmit = () => {
+    if (!regeneratingAsset) return;
+
+    regenerateAsset.mutate({
+      packageId: regeneratingAsset.packageId,
+      assetType: regeneratingAsset.assetType,
+      instructions: regenerateInstructions || undefined,
+    });
+  };
+
+  const handleCopyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
+    toast.success(`${label} copied to clipboard`);
   };
 
-  const handleFinalize = (id: number) => {
-    setAssets(
-      assets.map((asset) => (asset.id === id ? { ...asset, status: "finalized" } : asset))
-    );
-    if (selectedAsset?.id === id) {
-      setSelectedAsset({ ...selectedAsset, status: "finalized" });
+  const handleAssetEdit = (packageId: string, field: "youtubeTitle" | "youtubeDescription" | "scriptOutline", value: string) => {
+    updateAsset.mutate({
+      packageId,
+      [field]: value,
+    });
+  };
+
+  // Set first package as selected by default
+  useEffect(() => {
+    if (packages.length > 0 && !selectedPackageId) {
+      setSelectedPackageId(packages[0].id);
     }
-    toast.success("Asset finalized");
-  };
+  }, [packages, selectedPackageId]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-8 py-6 border-b border-border">
-        <h1 className="text-3xl font-bold text-foreground">Content Package</h1>
-        <p className="text-muted-foreground mt-1">
-          {assets.length} YouTube-ready content packages • {assets.filter((a) => a.status === "finalized").length} finalized
-        </p>
+  if (!runId) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No run ID provided. Please start a new run from the dashboard.
+          </AlertDescription>
+        </Alert>
       </div>
+    );
+  }
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Assets List */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-foreground">Content Assets</h3>
-            <div className="space-y-2">
-              {assets.map((asset) => (
-                <Card
-                  key={asset.id}
-                  className={`bg-card border-border cursor-pointer transition-all ${
-                    selectedAsset?.id === asset.id ? "border-accent bg-accent/5" : "hover:border-muted-foreground"
-                  }`}
-                  onClick={() => setSelectedAsset(asset)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm">{asset.topic}</CardTitle>
-                      <Badge
-                        variant={asset.status === "finalized" ? "default" : "outline"}
-                        className={asset.status === "finalized" ? "bg-accent text-accent-foreground" : ""}
-                      >
-                        {asset.status === "finalized" ? "✓" : "Draft"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Asset Details */}
-          {selectedAsset && (
-            <div className="lg:col-span-2 space-y-6">
-              {editingId === selectedAsset.id ? (
-                <div className="space-y-4">
-                  <Card className="bg-card border-border">
-                    <CardHeader>
-                      <CardTitle>Edit Content Asset</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <Label htmlFor="title" className="text-sm font-medium text-foreground mb-2 block">
-                          YouTube Title
-                        </Label>
-                        <Input
-                          id="title"
-                          value={editValues.youtubeTitle || ""}
-                          onChange={(e) => setEditValues({ ...editValues, youtubeTitle: e.target.value })}
-                          className="bg-input border-border"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {(editValues.youtubeTitle || "").length}/60 characters
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="description" className="text-sm font-medium text-foreground mb-2 block">
-                          YouTube Description
-                        </Label>
-                        <Textarea
-                          id="description"
-                          value={editValues.youtubeDescription || ""}
-                          onChange={(e) => setEditValues({ ...editValues, youtubeDescription: e.target.value })}
-                          className="bg-input border-border min-h-32"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="script" className="text-sm font-medium text-foreground mb-2 block">
-                          Script Outline
-                        </Label>
-                        <Textarea
-                          id="script"
-                          value={editValues.scriptOutline || ""}
-                          onChange={(e) => setEditValues({ ...editValues, scriptOutline: e.target.value })}
-                          className="bg-input border-border min-h-32 font-mono text-xs"
-                        />
-                      </div>
-
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          onClick={() => setEditingId(null)}
-                          className="border-border hover:bg-muted"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleEditSave}
-                          className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* YouTube Title */}
-                  <Card className="bg-card border-border">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Play className="w-5 h-5 text-accent" />
-                          <CardTitle>YouTube Title</CardTitle>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopy(selectedAsset.youtubeTitle)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm font-medium text-foreground">{selectedAsset.youtubeTitle}</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {selectedAsset.youtubeTitle.length}/60 characters
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  {/* YouTube Description */}
-                  <Card className="bg-card border-border">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-5 h-5 text-accent" />
-                          <CardTitle>YouTube Description</CardTitle>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopy(selectedAsset.youtubeDescription)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">
-                        {selectedAsset.youtubeDescription}
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  {/* Script Outline */}
-                  <Card className="bg-card border-border">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle>Script Outline</CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopy(selectedAsset.scriptOutline)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground font-mono whitespace-pre-wrap line-clamp-8">
-                        {selectedAsset.scriptOutline}
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleRegenerate(selectedAsset.id)}
-                      disabled={selectedAsset.isRegenerating}
-                      className="border-border hover:bg-muted"
-                    >
-                      {selectedAsset.isRegenerating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Regenerating...
-                        </>
-                      ) : (
-                        <>
-                          <ChevronRight className="w-4 h-4 mr-2" />
-                          Regenerate with LLM
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleEditStart(selectedAsset)}
-                      className="border-border hover:bg-muted"
-                    >
-                      <Edit2 className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-border hover:bg-muted"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    {selectedAsset.status !== "finalized" && (
-                      <Button
-                        onClick={() => handleFinalize(selectedAsset.id)}
-                        className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                      >
-                        Finalize
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
+    );
+  }
 
-      {/* Footer Actions */}
-      <div className="px-8 py-6 border-t border-border flex justify-between items-center gap-4 flex-wrap">
-        <Button variant="outline" className="border-border hover:bg-muted">
-          Back to Compilation
-        </Button>
-        <Link href="/review">
-          <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            Review & Export
-            <ChevronRight className="w-4 h-4 ml-2" />
+  if (error) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load content packages: {error.message}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (packages.length === 0) {
+    return (
+      <div className="container mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Content Package</h1>
+          <p className="text-muted-foreground mt-1">
+            Generate YouTube-ready assets for your compiled items
+          </p>
+        </div>
+
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No content packages found. Generate YouTube assets from your compiled items.
+          </AlertDescription>
+        </Alert>
+
+        <div className="flex items-center gap-4">
+          <Link href={`/compilation?runId=${runId}`}>
+            <Button variant="outline">Back to Compilation</Button>
+          </Link>
+          <Button onClick={handleGenerateAssets} disabled={generating} className="gap-2">
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating Assets...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                Generate YouTube Assets
+              </>
+            )}
           </Button>
-        </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId) || packages[0];
+
+  return (
+    <div className="container mx-auto py-8 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Content Package</h1>
+          <p className="text-muted-foreground mt-1">
+            Review and edit YouTube-ready assets
+          </p>
+        </div>
+        <Badge variant="secondary" className="text-lg px-4 py-2">
+          {packages.length} {packages.length === 1 ? "Package" : "Packages"}
+        </Badge>
+      </div>
+
+      {/* Package List */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Sidebar - Package List */}
+        <div className="md:col-span-1 space-y-2">
+          <h3 className="font-semibold mb-3">Content Items</h3>
+          {packages.map((pkg) => (
+            <Card
+              key={pkg.id}
+              className={`cursor-pointer transition-all ${
+                selectedPackageId === pkg.id
+                  ? "border-primary bg-primary/5"
+                  : "hover:border-primary/50"
+              }`}
+              onClick={() => setSelectedPackageId(pkg.id)}
+            >
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm">{pkg.compiledItem?.topic || "Unknown Topic"}</CardTitle>
+                <CardDescription className="text-xs line-clamp-2">
+                  {pkg.compiledItem?.hook || ""}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+
+        {/* Main Content - Selected Package */}
+        <div className="md:col-span-3 space-y-4">
+          {selectedPackage && (
+            <>
+              {/* Package Header */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-2xl">{selectedPackage.compiledItem?.topic}</CardTitle>
+                      <CardDescription className="mt-2">
+                        {selectedPackage.compiledItem?.hook}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={selectedPackage.status === "ready" ? "default" : "secondary"}>
+                      {selectedPackage.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* YouTube Assets Tabs */}
+              <Tabs defaultValue="title" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="title">Title</TabsTrigger>
+                  <TabsTrigger value="description">Description</TabsTrigger>
+                  <TabsTrigger value="script">Script Outline</TabsTrigger>
+                </TabsList>
+
+                {/* Title Tab */}
+                <TabsContent value="title" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>YouTube Title</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyToClipboard(selectedPackage.youtubeTitle || "", "Title")}
+                            className="gap-2"
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copy
+                          </Button>
+                          <Dialog open={dialogOpen && regeneratingAsset?.assetType === "title"} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRegenerateClick(selectedPackage.id, "title")}
+                                disabled={regenerateAsset.isPending}
+                                className="gap-2"
+                              >
+                                {regenerateAsset.isPending && regeneratingAsset?.assetType === "title" ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Regenerating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-4 w-4" />
+                                    Regenerate
+                                  </>
+                                )}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Regenerate Title</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <Textarea
+                                  placeholder="Provide instructions for regenerating the title (optional)..."
+                                  value={regenerateInstructions}
+                                  onChange={(e) => setRegenerateInstructions(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleRegenerateSubmit}>Regenerate</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={selectedPackage.youtubeTitle || ""}
+                        onChange={(e) => handleAssetEdit(selectedPackage.id, "youtubeTitle", e.target.value)}
+                        rows={2}
+                        className="font-medium text-lg"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {(selectedPackage.youtubeTitle || "").length} / 100 characters
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Description Tab */}
+                <TabsContent value="description" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>YouTube Description</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyToClipboard(selectedPackage.youtubeDescription || "", "Description")}
+                            className="gap-2"
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copy
+                          </Button>
+                          <Dialog open={dialogOpen && regeneratingAsset?.assetType === "description"} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRegenerateClick(selectedPackage.id, "description")}
+                                disabled={regenerateAsset.isPending}
+                                className="gap-2"
+                              >
+                                {regenerateAsset.isPending && regeneratingAsset?.assetType === "description" ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Regenerating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-4 w-4" />
+                                    Regenerate
+                                  </>
+                                )}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Regenerate Description</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <Textarea
+                                  placeholder="Provide instructions for regenerating the description (optional)..."
+                                  value={regenerateInstructions}
+                                  onChange={(e) => setRegenerateInstructions(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleRegenerateSubmit}>Regenerate</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={selectedPackage.youtubeDescription || ""}
+                        onChange={(e) => handleAssetEdit(selectedPackage.id, "youtubeDescription", e.target.value)}
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Script Outline Tab */}
+                <TabsContent value="script" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Script Outline</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyToClipboard(selectedPackage.scriptOutline || "", "Script Outline")}
+                            className="gap-2"
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copy
+                          </Button>
+                          <Dialog open={dialogOpen && regeneratingAsset?.assetType === "scriptOutline"} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRegenerateClick(selectedPackage.id, "scriptOutline")}
+                                disabled={regenerateAsset.isPending}
+                                className="gap-2"
+                              >
+                                {regenerateAsset.isPending && regeneratingAsset?.assetType === "scriptOutline" ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Regenerating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-4 w-4" />
+                                    Regenerate
+                                  </>
+                                )}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Regenerate Script Outline</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <Textarea
+                                  placeholder="Provide instructions for regenerating the script outline (optional)..."
+                                  value={regenerateInstructions}
+                                  onChange={(e) => setRegenerateInstructions(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleRegenerateSubmit}>Regenerate</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={selectedPackage.scriptOutline || ""}
+                        onChange={(e) => handleAssetEdit(selectedPackage.id, "scriptOutline", e.target.value)}
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
+              {/* Bottom Action Bar */}
+              <div className="flex items-center justify-between bg-card border rounded-lg p-4 sticky bottom-4">
+                <Link href={`/compilation?runId=${runId}`}>
+                  <Button variant="outline">Back to Compilation</Button>
+                </Link>
+                <Button className="gap-2">
+                  Export to Obsidian
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

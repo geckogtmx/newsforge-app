@@ -6,6 +6,7 @@ import { sourcesRouter } from "./routers/sources";
 import { runsRouter } from "./routers/runs";
 import { alertsRouter } from "./routers/alerts";
 import { compilationRouter } from "./routers/compilation";
+import { youtubeRouter } from "./routers/youtube";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -14,6 +15,7 @@ export const appRouter = router({
   runs: runsRouter,
   alerts: alertsRouter,
   compilation: compilationRouter,
+  youtube: youtubeRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
