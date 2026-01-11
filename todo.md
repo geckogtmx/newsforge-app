@@ -5,6 +5,8 @@
 **Preview URL**: https://newsforge-gbxpkwzy.manus.space/  
 **Last Updated**: 2026-01-10
 
+> ⚠️ **IMPORTANT**: This is the CORRECT repository (`newsforge-app`). Do NOT confuse with `news-forge` which is a different, unrelated project. See [PROJECT_INFO.md](PROJECT_INFO.md) for details.
+
 ---Project TODO
 
 ## Phase 1: Database Schema & Data Models
