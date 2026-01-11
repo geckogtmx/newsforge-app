@@ -364,7 +364,7 @@ export default function NewsInbox() {
           </DialogContent>
         </Dialog>
 
-        <Link href="/compile">
+        <Link href="/compilation">
           <Button
             disabled={selectedCount === 0}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"

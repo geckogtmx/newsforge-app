@@ -351,3 +351,15 @@
 - [x] Connect Content Package page to export functionality
 - [x] Add export button to Content Package page header
 - [ ] Test Obsidian export end-to-end with real data
+
+
+## Current Task: End-to-End Testing
+- [ ] Set up test RSS feeds (TechCrunch, Hacker News, etc.)
+- [ ] Create test sources in the database
+- [ ] Start a new run and verify headline collection
+- [ ] Test News Inbox display and selection
+- [ ] Test AI compilation with real headlines
+- [ ] Test YouTube asset generation
+- [ ] Test Obsidian export with real data
+- [ ] Fix any issues discovered during testing
+- [ ] Document the complete workflow
