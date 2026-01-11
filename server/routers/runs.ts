@@ -5,6 +5,8 @@ import { runs, rawHeadlines, newsSources } from "../../drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { aggregateHeadlines } from "../services/headlineAggregator";
+import { googleCustomSearch } from "../services/googleSearch";
+import { groupHeadlines, applyDeduplicationGroups } from "../services/deduplicationEngine";
 import { nanoid } from "nanoid";
 
 export const runsRouter = router({
@@ -248,6 +250,176 @@ export const runsRouter = router({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to get run history",
       });
-    }
-  }),
+      }
+    }),
+
+  /**
+   * Perform broader web search and add results to current run
+   */
+  broadSearch: protectedProcedure
+    .input(
+      z.object({
+        runId: z.string(),
+        query: z.string(),
+        maxResults: z.number().optional().default(10),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify run belongs to user
+        const run = await db.select().from(runs).where(eq(runs.id, input.runId)).limit(1);
+
+        if (run.length === 0 || run[0].userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Run not found" });
+        }
+
+        // Perform web search
+        const searchResults = await googleCustomSearch(input.query, input.maxResults);
+
+        if (searchResults.length === 0) {
+          return {
+            success: true,
+            addedCount: 0,
+            message: "No search results found. Please try a different query.",
+          };
+        }
+
+        // Add search results as headlines
+        for (const result of searchResults) {
+          await db.insert(rawHeadlines).values({
+            runId: input.runId,
+            sourceId: "web-search",
+            title: result.title,
+            description: result.description,
+            url: result.url,
+            publishedAt: new Date(),
+            source: "website",
+            isSelected: false,
+          });
+        }
+
+        // Update run stats
+        const currentRun = run[0];
+        const currentStats =
+          typeof currentRun.stats === "string"
+            ? JSON.parse(currentRun.stats)
+            : currentRun.stats || {};
+
+        await db
+          .update(runs)
+          .set({
+            stats: JSON.stringify({
+              ...currentStats,
+              itemsCollected: (currentStats.itemsCollected || 0) + searchResults.length,
+            }),
+          })
+          .where(eq(runs.id, input.runId));
+
+        return {
+          success: true,
+          addedCount: searchResults.length,
+          message: `Added ${searchResults.length} headlines from web search`,
+        };
+      } catch (error) {
+        console.error("[Runs] Error performing broad search:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to perform web search",
+        });
+      }
+    }),
+
+  /**
+   * Deduplicate headlines for a run
+   */
+  deduplicateHeadlines: protectedProcedure
+    .input(
+      z.object({
+        runId: z.string(),
+        threshold: z.number().optional().default(0.75),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify run belongs to user
+        const run = await db.select().from(runs).where(eq(runs.id, input.runId)).limit(1);
+
+        if (run.length === 0 || run[0].userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Run not found" });
+        }
+
+        // Get all headlines for this run
+        const headlines = await db
+          .select()
+          .from(rawHeadlines)
+          .where(eq(rawHeadlines.runId, input.runId));
+
+        if (headlines.length === 0) {
+          return {
+            success: true,
+            groupCount: 0,
+            message: "No headlines to deduplicate",
+          };
+        }
+
+        // Group headlines by similarity
+        const groups = await groupHeadlines(headlines, input.threshold);
+
+        // Apply deduplication metadata to headlines
+        const deduplicated = applyDeduplicationGroups(groups);
+
+        // Update headlines in database with deduplication metadata
+        // Note: This requires adding deduplicationGroupId, heatScore, isBestVersion fields to rawHeadlines table
+        // For now, we'll store this in a separate table or as JSON in a metadata field
+        
+        // Store deduplication results in run stats
+        const currentRun = run[0];
+        const currentStats =
+          typeof currentRun.stats === "string"
+            ? JSON.parse(currentRun.stats)
+            : currentRun.stats || {};
+
+        await db
+          .update(runs)
+          .set({
+            stats: JSON.stringify({
+              ...currentStats,
+              deduplicationGroups: groups.length,
+              totalHeadlines: headlines.length,
+              uniqueStories: groups.length,
+            }),
+          })
+          .where(eq(runs.id, input.runId));
+
+        return {
+          success: true,
+          groupCount: groups.length,
+          totalHeadlines: headlines.length,
+          message: `Found ${groups.length} unique stories from ${headlines.length} headlines`,
+          groups: groups.map(g => ({
+            groupId: g.groupId,
+            topic: g.topic,
+            heatScore: g.heatScore,
+            headlineCount: g.headlines.length,
+            bestVersionId: g.bestVersion.id,
+          })),
+        };
+      } catch (error) {
+        console.error("[Runs] Error deduplicating headlines:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to deduplicate headlines",
+        });
+      }
+    }),
 });

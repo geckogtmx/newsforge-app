@@ -64,6 +64,22 @@ export default function NewsInbox() {
     },
   });
 
+  // Broader web search mutation
+  const broadSearchMutation = trpc.runs.broadSearch.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      // Refetch headlines to include new search results
+      if (currentRunId) {
+        window.location.reload(); // Simple refresh to reload headlines
+      }
+      setIsSearchOpen(false);
+      setSearchQuery2("");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   // Initialize: check for current run or start a new one
   useEffect(() => {
     if (!isLoadingRun) {
@@ -147,44 +163,18 @@ export default function NewsInbox() {
       return;
     }
 
-    setIsSearching(true);
-    try {
-      // TODO: Call API to perform broader web search
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock new headlines from search
-      const newHeadlines: Headline[] = [
-        {
-          id: headlines.length + 1,
-          title: `Search result for "${searchQuery2}" - Article 1`,
-          description: "This is a search result from broader web search...",
-          url: "https://example.com/search-result-1",
-          source: "Web Search",
-          publishedAt: new Date(),
-          isSelected: false,
-          category: "Search Result",
-        },
-        {
-          id: headlines.length + 2,
-          title: `Search result for "${searchQuery2}" - Article 2`,
-          description: "Another relevant article from broader web search...",
-          url: "https://example.com/search-result-2",
-          source: "Web Search",
-          publishedAt: new Date(),
-          isSelected: false,
-          category: "Search Result",
-        },
-      ];
-
-      setHeadlines([...headlines, ...newHeadlines]);
-      setIsSearchOpen(false);
-      setSearchQuery2("");
-      toast.success(`Added ${newHeadlines.length} new headlines from web search`);
-    } catch (error) {
-      toast.error("Failed to perform web search");
-    } finally {
-      setIsSearching(false);
+    if (!currentRunId) {
+      toast.error("No active run");
+      return;
     }
+
+    setIsSearching(true);
+    broadSearchMutation.mutate({
+      runId: currentRunId,
+      query: searchQuery2,
+      maxResults: 10,
+    });
+    setIsSearching(false);
   };
 
   const filteredHeadlines = headlines.filter((h) => {
