@@ -22,6 +22,7 @@ export default function Compilation() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentRegenerateId, setCurrentRegenerateId] = useState<string | null>(null);
   const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
 
   // Fetch compiled items for this run
   const { data: items = [], isLoading, error, refetch } = trpc.compilation.getCompiledItems.useQuery(
@@ -55,6 +56,19 @@ export default function Compilation() {
     onError: (error) => {
       toast.error(`Failed to regenerate: ${error.message}`);
       setRegeneratingId(null);
+    },
+  });
+
+  // Auto-compilation mutation
+  const compileMutation = trpc.compilation.compileHeadlines.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Compilation complete! Generated ${result.compiledCount} items.`);
+      setIsCompiling(false);
+      refetch(); // Reload compiled items
+    },
+    onError: (error) => {
+      toast.error(`Compilation failed: ${error.message}`);
+      setIsCompiling(false);
     },
   });
 
@@ -130,6 +144,15 @@ export default function Compilation() {
     }
   }, [items]);
 
+  // Auto-compile when page loads with no items
+  useEffect(() => {
+    if (!isLoading && !isCompiling && items.length === 0 && runId && !compileMutation.isPending) {
+      setIsCompiling(true);
+      toast.info("Starting AI compilation...");
+      compileMutation.mutate({ runId });
+    }
+  }, [isLoading, items.length, runId, isCompiling]);
+
   if (!runId) {
     return (
       <div className="container mx-auto py-8">
@@ -143,11 +166,14 @@ export default function Compilation() {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || isCompiling) {
     return (
       <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">
+            {isCompiling ? "AI is compiling headlines into topics..." : "Loading compiled items..."}
+          </p>
         </div>
       </div>
     );
@@ -166,13 +192,13 @@ export default function Compilation() {
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && !isCompiling) {
     return (
       <div className="container mx-auto py-8">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            No compiled items found. Please compile headlines first.
+            No compiled items found. Compilation will start automatically.
           </AlertDescription>
         </Alert>
         <div className="mt-4">
