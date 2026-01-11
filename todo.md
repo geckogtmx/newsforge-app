@@ -332,3 +332,22 @@
 - [x] Add copy-to-clipboard functionality
 - [x] Add regenerate dialog with custom instructions
 - [ ] Test YouTube asset generation end-to-end
+
+
+## Current Task: Obsidian Export Service
+- [x] Create Obsidian export service with Markdown generation
+- [x] Implement YAML frontmatter generation (date, topic, sources, tags, heatScore)
+- [x] Implement backlinks between related items
+- [x] Create nested folder structure (YYYY/MM/DD)
+- [x] Implement automatic tagging based on topics and keywords
+- [x] Create batch export functionality for multiple packages
+- [x] Create daily index file generation
+- [x] Create knowledge graph file generation
+- [x] Create tRPC procedures for export operations
+- [x] Add exportPackage procedure (single export)
+- [x] Add exportRun procedure (batch export with archiving)
+- [x] Add getExportHistory procedure
+- [x] Add export router to main appRouter
+- [x] Connect Content Package page to export functionality
+- [x] Add export button to Content Package page header
+- [ ] Test Obsidian export end-to-end with real data

@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Copy, Loader2, FileText, RefreshCw, AlertCircle, Check } from "lucide-react";
+import { ChevronRight, Copy, Loader2, FileText, RefreshCw, AlertCircle, Check, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -24,6 +24,7 @@ export default function ContentPackage() {
   const [regenerateInstructions, setRegenerateInstructions] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Fetch content packages for this run
   const { data: packages = [], isLoading, error, refetch } = trpc.youtube.getPackages.useQuery(
@@ -40,6 +41,17 @@ export default function ContentPackage() {
     onError: (error) => {
       toast.error(`Failed to generate assets: ${error.message}`);
       setGenerating(false);
+    },
+  });
+
+  const exportRun = trpc.export.exportRun.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Exported ${result.totalExported} items to Obsidian`);
+      setExporting(false);
+    },
+    onError: (error) => {
+      toast.error(`Export failed: ${error.message}`);
+      setExporting(false);
     },
   });
 
@@ -193,9 +205,31 @@ export default function ContentPackage() {
             Review and edit YouTube-ready assets
           </p>
         </div>
-        <Badge variant="secondary" className="text-lg px-4 py-2">
-          {packages.length} {packages.length === 1 ? "Package" : "Packages"}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {packages.length} {packages.length === 1 ? "Package" : "Packages"}
+          </Badge>
+          <Button
+            onClick={() => {
+              setExporting(true);
+              exportRun.mutate({ runId });
+            }}
+            disabled={exporting}
+            className="gap-2"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Export to Obsidian
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Package List */}
