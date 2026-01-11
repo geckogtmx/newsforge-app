@@ -1,4 +1,11 @@
-# NewsForge Architecture & Design
+# NewsForge Architecture
+
+**GitHub Repository**: https://github.com/geckogtmx/newsforge-app  
+**Local Repository**: E:\git\newsforge-app  
+**Preview URL**: https://newsforge-gbxpkwzy.manus.space/  
+**Last Updated**: 2026-01-10
+
+--- & Design
 
 ## System Overview
 

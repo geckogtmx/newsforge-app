@@ -1,4 +1,11 @@
-# NewsForge Project TODO
+# NewsForge TODO
+
+**GitHub Repository**: https://github.com/geckogtmx/newsforge-app  
+**Local Repository**: E:\git\newsforge-app  
+**Preview URL**: https://newsforge-gbxpkwzy.manus.space/  
+**Last Updated**: 2026-01-10
+
+---Project TODO
 
 ## Phase 1: Database Schema & Data Models
 - [x] Create NewsSource table (id, userId, name, type, config, topics, isActive)
