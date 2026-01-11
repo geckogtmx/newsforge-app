@@ -42,7 +42,7 @@ function Router() {
           <Settings />
         </AppLayout>
       </Route>
-      <Route path={"/compile"}>
+      <Route path={"/compilation"}>
         <AppLayout>
           <Compilation />
         </AppLayout>

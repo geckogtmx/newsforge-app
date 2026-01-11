@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 interface Headline {
   id: number;
@@ -17,70 +18,82 @@ interface Headline {
   url: string;
   source: string;
   publishedAt: Date;
-  selected: boolean;
+  isSelected: boolean;
   category?: string;
 }
 
 export default function NewsInbox() {
-  const [headlines, setHeadlines] = useState<Headline[]>([
-    {
-      id: 1,
-      title: "OpenAI Releases GPT-5 with Multimodal Capabilities",
-      description: "OpenAI announced the release of GPT-5, featuring advanced multimodal capabilities for image, video, and text processing...",
-      url: "https://example.com/article1",
-      source: "TechCrunch",
-      publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      selected: false,
-      category: "AI",
-    },
-    {
-      id: 2,
-      title: "Anthropic Raises $5B in Series C Funding",
-      description: "Anthropic secures major funding round to accelerate AI research and safety initiatives...",
-      url: "https://example.com/article2",
-      source: "The Information",
-      publishedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      selected: false,
-      category: "AI",
-    },
-    {
-      id: 3,
-      title: "Google Announces New Gemini 2.0 Features",
-      description: "Google unveils new features for Gemini AI model including real-time reasoning and improved code generation...",
-      url: "https://example.com/article3",
-      source: "Google Blog",
-      publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-      selected: false,
-      category: "AI",
-    },
-    {
-      id: 4,
-      title: "Meta Releases Open-Source AI Models",
-      description: "Meta releases new open-source AI models to democratize access to advanced machine learning technology...",
-      url: "https://example.com/article4",
-      source: "Meta Research",
-      publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      selected: false,
-      category: "Open Source",
-    },
-    {
-      id: 5,
-      title: "AI Safety Researchers Publish New Alignment Framework",
-      description: "Leading AI safety researchers publish groundbreaking framework for aligning AI systems with human values...",
-      url: "https://example.com/article5",
-      source: "arXiv",
-      publishedAt: new Date(Date.now() - 10 * 60 * 60 * 1000),
-      selected: false,
-      category: "Research",
-    },
-  ]);
-
+  const [, navigate] = useLocation();
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery2, setSearchQuery2] = useState("");
+
+  // Get current run
+  const { data: currentRun, isLoading: isLoadingRun } = trpc.runs.getCurrentRun.useQuery();
+
+  // Get headlines for current run
+  const { data: headlinesData, isLoading: isLoadingHeadlines } = trpc.runs.getHeadlines.useQuery(
+    { runId: currentRunId! },
+    { enabled: !!currentRunId }
+  );
+
+  // Start new run mutation
+  const startRunMutation = trpc.runs.startRun.useMutation({
+    onSuccess: (data) => {
+      setCurrentRunId(data.runId);
+      toast.success(data.message);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // Update headline selection mutation
+  const updateSelectionMutation = trpc.runs.updateHeadlineSelection.useMutation({
+    onSuccess: () => {
+      toast.success("Selection saved");
+      navigate("/compilation");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // Initialize: check for current run or start a new one
+  useEffect(() => {
+    if (!isLoadingRun) {
+      if (currentRun) {
+        setCurrentRunId(currentRun.id);
+      } else {
+        // No active run, start a new one
+        startRunMutation.mutate();
+      }
+    }
+  }, [currentRun, isLoadingRun]);
+
+  // Update headlines when data is loaded
+  useEffect(() => {
+    if (headlinesData) {
+      setHeadlines(
+        headlinesData.map((h) => ({
+          id: h.id,
+          title: h.title,
+          description: h.description || "",
+          url: h.url,
+          source: h.source,
+          publishedAt: h.publishedAt ? new Date(h.publishedAt) : new Date(),
+          isSelected: h.isSelected,
+          category: undefined, // TODO: Add category extraction
+        }))
+      );
+      setSelectedCount(headlinesData.filter((h) => h.isSelected).length);
+    }
+  }, [headlinesData]);
 
   // Get unique categories
   const categories = Array.from(new Set(headlines.map((h) => h.category).filter(Boolean))) as string[];
@@ -89,8 +102,8 @@ export default function NewsInbox() {
     setHeadlines(
       headlines.map((h) => {
         if (h.id === id) {
-          setSelectedCount(h.selected ? selectedCount - 1 : selectedCount + 1);
-          return { ...h, selected: !h.selected };
+          setSelectedCount(h.isSelected ? selectedCount - 1 : selectedCount + 1);
+          return { ...h, isSelected: !h.isSelected };
         }
         return h;
       })
@@ -98,16 +111,34 @@ export default function NewsInbox() {
   };
 
   const handleSelectAll = () => {
-    const allSelected = filteredHeadlines.every((h) => h.selected);
+    const allSelected = filteredHeadlines.every((h) => h.isSelected);
     const newHeadlines = headlines.map((h) => {
       if (filteredHeadlines.find((fh) => fh.id === h.id)) {
-        return { ...h, selected: !allSelected };
+        return { ...h, isSelected: !allSelected };
       }
       return h;
     });
     setHeadlines(newHeadlines);
-    const newCount = newHeadlines.filter((h) => h.selected).length;
+    const newCount = newHeadlines.filter((h) => h.isSelected).length;
     setSelectedCount(newCount);
+  };
+
+  const handleContinueToCompile = () => {
+    if (!currentRunId) {
+      toast.error("No active run");
+      return;
+    }
+
+    if (selectedCount === 0) {
+      toast.error("Please select at least one headline");
+      return;
+    }
+
+    const selectedIds = headlines.filter((h) => h.isSelected).map((h) => h.id);
+    updateSelectionMutation.mutate({
+      runId: currentRunId,
+      headlineIds: selectedIds,
+    });
   };
 
   const handleBroaderSearch = async () => {
@@ -130,7 +161,7 @@ export default function NewsInbox() {
           url: "https://example.com/search-result-1",
           source: "Web Search",
           publishedAt: new Date(),
-          selected: false,
+          isSelected: false,
           category: "Search Result",
         },
         {
@@ -140,7 +171,7 @@ export default function NewsInbox() {
           url: "https://example.com/search-result-2",
           source: "Web Search",
           publishedAt: new Date(),
-          selected: false,
+          isSelected: false,
           category: "Search Result",
         },
       ];
@@ -175,6 +206,18 @@ export default function NewsInbox() {
     if (days < 7) return `${days}d ago`;
     return date.toLocaleDateString();
   };
+
+  // Loading state
+  if (isLoadingRun || startRunMutation.isPending || isLoadingHeadlines) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <Loader2 className="w-12 h-12 text-accent animate-spin mb-4" />
+        <p className="text-muted-foreground text-lg">
+          {startRunMutation.isPending ? "Starting new run..." : "Loading headlines..."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -235,7 +278,7 @@ export default function NewsInbox() {
                 className="border-border hover:bg-muted h-10"
               >
                 <Filter className="w-4 h-4 mr-2" />
-                {filteredHeadlines.every((h) => h.selected) ? "Deselect All" : "Select All"}
+                {filteredHeadlines.every((h) => h.isSelected) ? "Deselect All" : "Select All"}
               </Button>
             </div>
           </div>
@@ -245,7 +288,11 @@ export default function NewsInbox() {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Search className="w-12 h-12 text-muted-foreground/30 mb-4" />
               <p className="text-muted-foreground text-lg font-medium">No headlines found</p>
-              <p className="text-muted-foreground text-sm mt-1">Try adjusting your search or filters</p>
+              <p className="text-muted-foreground text-sm mt-1">
+                {headlines.length === 0
+                  ? "No headlines were collected from your sources. Please check your source configuration."
+                  : "Try adjusting your search or filters"}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -253,14 +300,14 @@ export default function NewsInbox() {
                 <Card
                   key={headline.id}
                   className={`bg-card border-border cursor-pointer transition-all ${
-                    headline.selected ? "border-accent bg-accent/5 shadow-md" : "hover:border-muted-foreground"
+                    headline.isSelected ? "border-accent bg-accent/5 shadow-md" : "hover:border-muted-foreground"
                   }`}
                   onClick={() => handleSelectHeadline(headline.id)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex gap-4">
                       <Checkbox
-                        checked={headline.selected}
+                        checked={headline.isSelected}
                         onChange={() => handleSelectHeadline(headline.id)}
                         onClick={(e) => e.stopPropagation()}
                         className="mt-1 flex-shrink-0"
@@ -278,17 +325,18 @@ export default function NewsInbox() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center text-xs text-muted-foreground flex-wrap gap-2">
-                      <div className="flex gap-3">
-                        <span className="font-medium">{headline.source}</span>
+                  <CardContent className="pt-0 pb-4">
+                    <div className="flex items-center justify-between text-sm ml-10">
+                      <div className="flex items-center gap-4 text-muted-foreground">
+                        <span>{headline.source}</span>
+                        <span>•</span>
                         <span>{formatDate(headline.publishedAt)}</span>
                       </div>
                       <a
                         href={headline.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-accent hover:text-accent/80 flex items-center gap-1"
+                        className="flex items-center gap-1 text-accent hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
                         Read more
@@ -300,79 +348,88 @@ export default function NewsInbox() {
               ))}
             </div>
           )}
+
+          {/* Broader Web Search Dialog */}
+          <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="w-full border-dashed border-border hover:bg-muted">
+                <Globe className="w-4 h-4 mr-2" />
+                Broader Web Search
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Broader Web Search</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div>
+                  <Label htmlFor="search-query" className="text-sm text-muted-foreground mb-2 block">
+                    Search Query
+                  </Label>
+                  <Input
+                    id="search-query"
+                    placeholder="Enter keywords or topics..."
+                    value={searchQuery2}
+                    onChange={(e) => setSearchQuery2(e.target.value)}
+                    className="bg-input border-border"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleBroaderSearch}
+                    disabled={isSearching}
+                    className="flex-1"
+                  >
+                    {isSearching ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4 mr-2" />
+                        Search
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsSearchOpen(false)} className="border-border">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="px-8 py-6 border-t border-border flex justify-between items-center gap-4 flex-wrap">
-        <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="border-border hover:bg-muted">
-              <Globe className="w-4 h-4 mr-2" />
-              Broader Web Search
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Search for Additional Headlines</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="webSearch" className="text-sm font-medium text-foreground mb-2 block">
-                  Search Query
-                </Label>
-                <Input
-                  id="webSearch"
-                  placeholder="Enter search terms (e.g., 'AI breakthroughs 2026')"
-                  value={searchQuery2}
-                  onChange={(e) => setSearchQuery2(e.target.value)}
-                  className="bg-input border-border"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isSearching) {
-                      handleBroaderSearch();
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsSearchOpen(false)}
-                  className="border-border hover:bg-muted"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBroaderSearch}
-                  disabled={isSearching || !searchQuery2.trim()}
-                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                >
-                  {isSearching ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Headlines
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Link href="/compilation">
+      {/* Footer */}
+      <div className="px-8 py-4 border-t border-border bg-card/50">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {selectedCount > 0 ? (
+              <span className="text-accent font-medium">{selectedCount} headlines selected</span>
+            ) : (
+              <span>Select headlines to continue</span>
+            )}
+          </div>
           <Button
-            disabled={selectedCount === 0}
-            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            onClick={handleContinueToCompile}
+            disabled={selectedCount === 0 || updateSelectionMutation.isPending}
+            className="gap-2"
           >
-            Continue to Compile ({selectedCount})
-            <ChevronRight className="w-4 h-4 ml-2" />
+            {updateSelectionMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                Continue to Compile ({selectedCount})
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
           </Button>
-        </Link>
+        </div>
       </div>
     </div>
   );

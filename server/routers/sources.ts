@@ -5,6 +5,9 @@ import { newsSources } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
+import { parseRSSFeed } from "../services/rssParser";
+import { scrapeWebsite } from "../services/webScraper";
+import { fetchYouTubeChannelVideos } from "../services/youtubeIntegration";
 
 const sourceTypeEnum = z.enum(["rss", "gmail", "youtube", "website"]);
 
@@ -233,12 +236,35 @@ export const sourcesRouter = router({
         }
 
         const source = sources[0];
+        const config = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
 
-        // TODO: Implement actual testing logic based on source type
-        // For now, return mock success
+        // Test connection based on source type
+        let itemCount = 0;
+        if (source.type === "rss") {
+          if (!config.url) {
+            throw new Error("RSS feed URL is required");
+          }
+          const headlines = await parseRSSFeed(config.url);
+          itemCount = headlines.length;
+        } else if (source.type === "website") {
+          if (!config.url) {
+            throw new Error("Website URL is required");
+          }
+          const headlines = await scrapeWebsite(config.url, config.selectors);
+          itemCount = headlines.length;
+        } else if (source.type === "youtube") {
+          if (!config.channelId) {
+            throw new Error("YouTube channel ID is required");
+          }
+          const headlines = await fetchYouTubeChannelVideos(config.channelId, 10);
+          itemCount = headlines.length;
+        } else {
+          throw new Error(`Source type ${source.type} not yet implemented`);
+        }
+
         return {
           success: true,
-          itemCount: Math.floor(Math.random() * 50) + 10,
+          itemCount,
           error: null,
         };
       } catch (error) {

@@ -363,3 +363,9 @@
 - [ ] Test Obsidian export with real data
 - [ ] Fix any issues discovered during testing
 - [ ] Document the complete workflow
+
+## Current Issues to Fix
+- [x] Connect News Inbox to backend - replace mock data with real headlines from database using trpc.runs.getHeadlines
+- [x] Fix routing issue - ensure /compilation route is properly configured in App.tsx
+- [x] Implement actual RSS feed testing in sources.testConnection procedure
+- [ ] Verify headline aggregation is working correctly when starting a new run
