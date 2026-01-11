@@ -29,7 +29,7 @@ export async function aggregateHeadlines(
       let sourceHeadlines: AggregatedHeadline[] = [];
 
       if (source.type === "rss") {
-        const config = source.config as any;
+        const config = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
         if (config.url) {
           const rssHeadlines = await parseRSSFeed(config.url);
           sourceHeadlines = rssHeadlines.map((h) => ({
@@ -39,7 +39,7 @@ export async function aggregateHeadlines(
           }));
         }
       } else if (source.type === "website") {
-        const config = source.config as any;
+        const config = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
         if (config.url) {
           const scraped = await scrapeWebsite(config.url, config.selectors);
           sourceHeadlines = scraped.map((h) => ({
@@ -49,7 +49,7 @@ export async function aggregateHeadlines(
           }));
         }
       } else if (source.type === "youtube") {
-        const config = source.config as any;
+        const config = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
         if (config.channelId) {
           const ytHeadlines = await fetchYouTubeChannelVideos(config.channelId, 10);
           sourceHeadlines = ytHeadlines.map((h) => ({

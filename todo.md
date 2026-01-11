@@ -368,4 +368,7 @@
 - [x] Connect News Inbox to backend - replace mock data with real headlines from database using trpc.runs.getHeadlines
 - [x] Fix routing issue - ensure /compilation route is properly configured in App.tsx
 - [x] Implement actual RSS feed testing in sources.testConnection procedure
-- [ ] Verify headline aggregation is working correctly when starting a new run
+- [x] Verify headline aggregation is working correctly when starting a new run
+- [x] Add BBC News RSS feed to test parsing functionality
+- [x] Debug why TechCrunch RSS feed isn't returning headlines - Fixed JSON parsing issue in aggregateHeadlines
+- [x] Verify headlines are being saved to database during run - 54 headlines collected successfully
