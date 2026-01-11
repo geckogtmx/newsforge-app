@@ -5,6 +5,7 @@ import { runs, rawHeadlines, compiledItems, userSettings } from "../../drizzle/s
 import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { compileHeadlines, regenerateCompiledItem } from "../services/aiCompilation";
+import { estimateCompilationCost } from "../services/costEstimation";
 import { nanoid } from "nanoid";
 
 export const compilationRouter = router({
@@ -278,6 +279,97 @@ export const compilationRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to regenerate item",
+        });
+      }
+    }),
+
+  /**
+   * Estimate cost before compilation
+   */
+  estimateCost: protectedProcedure
+    .input(
+      z.object({
+        runId: z.string(),
+        headlineIds: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify run belongs to user
+        const runRecords = await db
+          .select()
+          .from(runs)
+          .where(and(eq(runs.id, input.runId), eq(runs.userId, ctx.user.id)))
+          .limit(1);
+
+        if (runRecords.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Run not found" });
+        }
+
+        // Get headlines to estimate
+        let headlinesToEstimate;
+        if (input.headlineIds && input.headlineIds.length > 0) {
+          const numericIds = input.headlineIds.map(id => parseInt(id, 10));
+          headlinesToEstimate = await db
+            .select()
+            .from(rawHeadlines)
+            .where(
+              and(
+                eq(rawHeadlines.runId, input.runId),
+                inArray(rawHeadlines.id, numericIds)
+              )
+            );
+        } else {
+          headlinesToEstimate = await db
+            .select()
+            .from(rawHeadlines)
+            .where(and(eq(rawHeadlines.runId, input.runId), eq(rawHeadlines.isSelected, true)));
+        }
+
+        if (headlinesToEstimate.length === 0) {
+          return {
+            estimatedTokens: 0,
+            estimatedCost: 0,
+            breakdown: [],
+          };
+        }
+
+        // Calculate average headline length
+        const totalLength = headlinesToEstimate.reduce(
+          (sum, h) => sum + h.title.length + (h.description?.length || 0),
+          0
+        );
+        const avgLength = Math.ceil(totalLength / headlinesToEstimate.length);
+
+        // Get user's selected model
+        const settingsRecords = await db
+          .select()
+          .from(userSettings)
+          .where(eq(userSettings.userId, ctx.user.id))
+          .limit(1);
+
+        const model = settingsRecords[0]?.llmModel
+          ? String(settingsRecords[0].llmModel)
+          : "gpt-4.1-mini";
+
+        // Estimate cost
+        const estimate = estimateCompilationCost(
+          headlinesToEstimate.length,
+          avgLength,
+          model
+        );
+
+        return estimate;
+      } catch (error) {
+        console.error("[Compilation] Error estimating cost:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to estimate cost",
         });
       }
     }),

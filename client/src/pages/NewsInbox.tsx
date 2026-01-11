@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X } from "lucide-react";
+import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X, Flame, ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -20,6 +20,17 @@ interface Headline {
   publishedAt: Date;
   isSelected: boolean;
   category?: string;
+  deduplicationGroupId?: string;
+  heatScore?: number;
+  isBestVersion?: boolean;
+}
+
+interface DeduplicationGroup {
+  groupId: string;
+  topic: string;
+  heatScore: number;
+  headlineCount: number;
+  bestVersionId: number;
 }
 
 export default function NewsInbox() {
@@ -32,6 +43,9 @@ export default function NewsInbox() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery2, setSearchQuery2] = useState("");
+  const [deduplicationGroups, setDeduplicationGroups] = useState<DeduplicationGroup[]>([]);
+  const [showDeduplication, setShowDeduplication] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Get current run
   const { data: currentRun, isLoading: isLoadingRun } = trpc.runs.getCurrentRun.useQuery();
@@ -74,6 +88,18 @@ export default function NewsInbox() {
       }
       setIsSearchOpen(false);
       setSearchQuery2("");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // Deduplication mutation
+  const deduplicationMutation = trpc.runs.deduplicateHeadlines.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setDeduplicationGroups(data.groups || []);
+      setShowDeduplication(true);
     },
     onError: (error) => {
       toast.error(error.message);
@@ -177,6 +203,28 @@ export default function NewsInbox() {
     setIsSearching(false);
   };
 
+  const handleDeduplication = () => {
+    if (!currentRunId) {
+      toast.error("No active run");
+      return;
+    }
+
+    deduplicationMutation.mutate({
+      runId: currentRunId,
+      threshold: 0.75,
+    });
+  };
+
+  const toggleGroupExpansion = (groupId: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
   const filteredHeadlines = headlines.filter((h) => {
     const matchesSearch =
       h.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -270,8 +318,50 @@ export default function NewsInbox() {
                 <Filter className="w-4 h-4 mr-2" />
                 {filteredHeadlines.every((h) => h.isSelected) ? "Deselect All" : "Select All"}
               </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleDeduplication}
+                disabled={deduplicationMutation.isPending || headlines.length === 0}
+                className="border-border hover:bg-muted h-10"
+              >
+                {deduplicationMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Flame className="w-4 h-4 mr-2" />
+                )}
+                Find Duplicates
+              </Button>
             </div>
           </div>
+
+          {/* Deduplication Info Banner */}
+          {showDeduplication && deduplicationGroups.length > 0 && (
+            <Card className="bg-accent/5 border-accent">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Flame className="w-5 h-5 text-accent" />
+                    <div>
+                      <p className="font-medium text-foreground">
+                        Found {deduplicationGroups.length} unique stories from {headlines.length} headlines
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Headlines are grouped by similarity. Heat score shows coverage from multiple sources.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDeduplication(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Headlines List */}
           {filteredHeadlines.length === 0 ? (
@@ -283,6 +373,108 @@ export default function NewsInbox() {
                   ? "No headlines were collected from your sources. Please check your source configuration."
                   : "Try adjusting your search or filters"}
               </p>
+            </div>
+          ) : showDeduplication && deduplicationGroups.length > 0 ? (
+            <div className="space-y-4">
+              {deduplicationGroups.map((group) => {
+                const groupHeadlines = headlines.filter(
+                  (h) => deduplicationGroups.find(g => g.bestVersionId === h.id && g.groupId === group.groupId)
+                );
+                const isExpanded = expandedGroups.has(group.groupId);
+                const allGroupHeadlines = headlines.filter(
+                  (h) => h.id === group.bestVersionId || (isExpanded && groupHeadlines.some(gh => gh.id === h.id))
+                );
+
+                return (
+                  <Card key={group.groupId} className="bg-card border-border">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Flame className="w-4 h-4 text-orange-500" />
+                            <span className="text-sm font-medium text-orange-500">
+                              Heat Score: {group.heatScore}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              • {group.headlineCount} {group.headlineCount === 1 ? 'source' : 'sources'}
+                            </span>
+                          </div>
+                          <CardTitle className="text-lg">{group.topic}</CardTitle>
+                        </div>
+                        {group.headlineCount > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleGroupExpansion(group.groupId)}
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp className="w-4 h-4 mr-1" />
+                                Hide {group.headlineCount - 1} more
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4 mr-1" />
+                                Show {group.headlineCount - 1} more
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {headlines
+                        .filter((h) => h.id === group.bestVersionId)
+                        .map((headline) => (
+                          <div
+                            key={headline.id}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              headline.isSelected
+                                ? "border-accent bg-accent/5"
+                                : "border-border hover:border-muted-foreground"
+                            }`}
+                            onClick={() => handleSelectHeadline(headline.id)}
+                          >
+                            <div className="flex gap-4">
+                              <Checkbox
+                                checked={headline.isSelected}
+                                onChange={() => handleSelectHeadline(headline.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-1 flex-shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start gap-2 mb-2">
+                                  <h4 className="font-medium text-foreground flex-1">{headline.title}</h4>
+                                  <span className="text-xs px-2 py-1 bg-green-500/10 text-green-500 rounded whitespace-nowrap">
+                                    Best Version
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-3">{headline.description}</p>
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-4 text-muted-foreground">
+                                    <span>{headline.source}</span>
+                                    <span>•</span>
+                                    <span>{formatDate(headline.publishedAt)}</span>
+                                  </div>
+                                  <a
+                                    href={headline.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-accent hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Read more
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-3">
