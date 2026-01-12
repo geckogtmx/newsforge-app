@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Compilation from "./pages/Compilation";
 import ContentPackage from "./pages/ContentPackage";
 import KeywordAlerts from "./pages/KeywordAlerts";
+import { ChatWidget } from "./components/ChatWidget";
 
 function Router() {
   return (
@@ -70,6 +71,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <ChatWidget />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
