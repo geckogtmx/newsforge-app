@@ -23,6 +23,7 @@ NewsForge is a web application that automates the workflow of researching, compi
 6. **Content Package** - Select items and generate YouTube assets (hooks, titles, descriptions, scripts)
 7. **Review & Edit** - Review generated content and request changes
 8. **Export & Archive** - Export to Obsidian vault and archive the run
+9. **Chat Assistant** - AI-powered floating widget for querying archives and generating new content
 
 ## Data Models
 
@@ -70,6 +71,7 @@ NewsForge is a web application that automates the workflow of researching, compi
 - `summary` (string: extended summary)
 - `sourceHeadlineIds` (JSON array: IDs of RawHeadlines that contributed)
 - `isSelected` (boolean)
+- `generatedBy` (VARCHAR: null or "assistant")
 - `createdAt`, `updatedAt`
 
 #### ContentPackage
@@ -78,6 +80,8 @@ NewsForge is a web application that automates the workflow of researching, compi
 - `compiledItemId` (FK)
 - `youtubeTitle`, `youtubeDescription`, `scriptOutline`
 - `status` (enum: "draft", "ready", "exported")
+- `generatedBy` (VARCHAR: null or "assistant")
+- `sourceConversationId` (VARCHAR: FK to ChatConversation, nullable)
 - `createdAt`, `updatedAt`
 
 #### RunArchive
@@ -87,6 +91,20 @@ NewsForge is a web application that automates the workflow of researching, compi
 - `archivedData` (JSON: full run data for historical reference)
 - `obsidianExportPath` (string)
 - `archivedAt`
+
+#### ChatConversation
+- `id` (PK, VARCHAR)
+- `userId` (FK)
+- `title` (string: auto-generated from first message)
+- `createdAt`, `updatedAt`
+
+#### ChatMessage
+- `id` (PK)
+- `conversationId` (FK)
+- `role` (enum: "user", "assistant", "system")
+- `content` (TEXT)
+- `metadata` (JSON: referencedRuns, referencedItems, createdAssets, tokens)
+- `createdAt`
 
 ### Settings
 - `id` (PK)
@@ -223,6 +241,29 @@ NewsForge is a web application that automates the workflow of researching, compi
 3. **Obsidian Export Failures** - Provide clear error messages and fallback options
 4. **User Feedback** - Display clear error messages and recovery suggestions
 
+## Chat Assistant Feature
+
+The **Chat Assistant** is a floating widget accessible from any page in the application. It provides AI-powered querying of NewsForge archives and can generate new content based on historical data.
+
+### Key Capabilities
+- **Archive Querying**: Natural language search across all runs, items, and packages
+- **Content Generation**: Create NEW compiled items and content packages from archive data
+- **Trend Analysis**: Identify patterns and emerging topics across time
+- **Context-Aware**: Knows current page and can reference active data
+
+### Data Constraints
+- **Read-Only Archives**: Cannot modify existing runs, items, or packages
+- **Write-Enabled Creation**: Can generate NEW content marked as `generatedBy: "assistant"`
+- **Isolated Access**: Only accesses NewsForge data, no external sources
+
+### UI Design
+- Floating icon in bottom-left corner (always visible)
+- Expands into chat panel overlay (400×600px)
+- Dark theme matching application design
+- Markdown-formatted responses with citations
+
+See [CHAT_ASSISTANT_ARCHITECTURE.md](CHAT_ASSISTANT_ARCHITECTURE.md) for detailed implementation specifications.
+
 ## Future Enhancements
 
 1. **Scheduled Runs** - Automate daily/weekly news collection
@@ -231,3 +272,5 @@ NewsForge is a web application that automates the workflow of researching, compi
 4. **Advanced Analytics** - Track content performance metrics
 5. **Multi-language Support** - Translate content to different languages
 6. **Video Generation** - Integrate with video generation services
+7. **Voice Input** - Speak queries to Chat Assistant
+8. **Scheduled Summaries** - Daily/weekly email digests via Chat Assistant

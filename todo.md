@@ -26,6 +26,10 @@
 - [x] Add costEstimate and tokenUsage fields to Run table
 - [x] Add isIncremental field to Run table
 - [x] Add budget tracking fields to userSettings table
+- [ ] Create ChatConversation table (id, userId, title, createdAt, updatedAt)
+- [ ] Create ChatMessage table (id, conversationId, role, content, metadata, createdAt)
+- [ ] Add generatedBy field to CompiledItem table
+- [ ] Add generatedBy and sourceConversationId fields to ContentPackage table
 
 ## Phase 2: Backend Services - News Source Integration
 - [x] Implement RSS feed parser service
@@ -361,6 +365,33 @@
 - [x] Add export button to Content Package page header
 - [ ] Test Obsidian export end-to-end with real data
 
+
+## Phase 26: Chat Assistant Feature
+- [ ] Create database migration for ChatConversation and ChatMessage tables
+- [ ] Add generatedBy columns to CompiledItem and ContentPackage tables
+- [ ] Implement chatAssistant.ts service
+  - [ ] parseQuery() - Extract intent and entities from user message
+  - [ ] buildArchiveContext() - Query relevant archive data
+  - [ ] generateChatResponse() - Generate LLM response with citations
+  - [ ] createContentFromChat() - Create NEW content from assistant
+- [ ] Create chat.ts tRPC router
+  - [ ] chat.sendMessage() - Process user query and respond
+  - [ ] chat.createContent() - Generate new compiled items/packages
+  - [ ] chat.getConversation() - Retrieve message history
+  - [ ] chat.listConversations() - List all user conversations
+  - [ ] chat.deleteConversation() - Delete conversation
+- [ ] Build ChatWidget.tsx component
+  - [ ] Floating icon (bottom-left corner)
+  - [ ] Expandable chat panel (400×600px)
+  - [ ] Message history display
+  - [ ] Input box with send button
+  - [ ] Loading states and animations
+- [ ] Integrate ChatWidget into App.tsx (global component)
+- [ ] Test archive querying functionality
+- [ ] Test content generation from chat
+- [ ] Add conversation history management
+- [ ] Implement cost tracking for chat usage
+- [ ] Mobile responsive design
 
 ## Current Task: End-to-End Testing
 - [ ] Set up test RSS feeds (TechCrunch, Hacker News, etc.)
