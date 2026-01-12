@@ -99,6 +99,7 @@ export const compiledItems = mysqlTable("compiledItems", {
   sourceHeadlineIds: json("sourceHeadlineIds").notNull(), // Array of RawHeadline IDs
   heatScore: int("heatScore").default(1).notNull(),
   isSelected: boolean("isSelected").default(false).notNull(),
+  generatedBy: varchar("generatedBy", { length: 50 }), // null or "assistant"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -114,6 +115,9 @@ export const contentPackages = mysqlTable("contentPackages", {
   youtubeDescription: text("youtubeDescription"),
   scriptOutline: text("scriptOutline"),
   status: mysqlEnum("status", ["draft", "ready", "exported"]).default("draft").notNull(),
+  isReady: boolean("isReady").default(false).notNull(),
+  generatedBy: varchar("generatedBy", { length: 50 }), // null or "assistant"
+  sourceConversationId: varchar("sourceConversationId", { length: 64 }), // FK to chatConversations
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -178,3 +182,27 @@ export const headlineEmbeddings = mysqlTable("headlineEmbeddings", {
 
 export type HeadlineEmbedding = typeof headlineEmbeddings.$inferSelect;
 export type InsertHeadlineEmbedding = typeof headlineEmbeddings.$inferInsert;
+
+// Chat Assistant Tables
+export const chatConversations = mysqlTable("chatConversations", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InsertChatConversation = typeof chatConversations.$inferInsert;
+
+export const chatMessages = mysqlTable("chatMessages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: varchar("conversationId", { length: 64 }).notNull(),
+  role: mysqlEnum("role", ["user", "assistant", "system"]).notNull(),
+  content: text("content").notNull(),
+  metadata: json("metadata"), // { referencedRuns, referencedItems, createdAssets, tokens }
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;

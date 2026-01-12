@@ -8,6 +8,7 @@ import { alertsRouter } from "./routers/alerts";
 import { compilationRouter } from "./routers/compilation";
 import { youtubeRouter } from "./routers/youtube";
 import { exportRouter } from "./routers/export";
+import { chatRouter } from "./routers/chat";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -18,6 +19,7 @@ export const appRouter = router({
   compilation: compilationRouter,
   youtube: youtubeRouter,
   export: exportRouter,
+  chat: chatRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
