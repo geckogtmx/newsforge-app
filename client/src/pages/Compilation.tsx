@@ -345,7 +345,7 @@ export default function Compilation() {
       </div>
 
       {/* Bottom Action Bar */}
-      <div className="flex items-      <div className="flex items-center justify-between p-6 border-t">
+      <div className="flex items-center justify-between p-6 border-t">
         <Link href={`/run?runId=${runId}`}>
           <Button variant="outline">Back to News Inbox</Button>
         </Link>

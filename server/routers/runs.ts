@@ -164,6 +164,10 @@ export const runsRouter = router({
           source: h.source,
           publishedAt: h.publishedAt,
           isSelected: h.isSelected,
+          deduplicationGroupId: h.deduplicationGroupId,
+          heatScore: h.heatScore,
+          isBestVersion: h.isBestVersion,
+          matchedKeywords: h.matchedKeywords,
         }));
       } catch (error) {
         console.error("[Runs] Error getting headlines:", error);
@@ -379,8 +383,16 @@ export const runsRouter = router({
         const deduplicated = applyDeduplicationGroups(groups);
 
         // Update headlines in database with deduplication metadata
-        // Note: This requires adding deduplicationGroupId, heatScore, isBestVersion fields to rawHeadlines table
-        // For now, we'll store this in a separate table or as JSON in a metadata field
+        for (const headline of deduplicated) {
+          await db
+            .update(rawHeadlines)
+            .set({
+              deduplicationGroupId: headline.deduplicationGroupId,
+              heatScore: headline.heatScore,
+              isBestVersion: headline.isBestVersion,
+            })
+            .where(eq(rawHeadlines.id, headline.id));
+        }
         
         // Store deduplication results in run stats
         const currentRun = run[0];
