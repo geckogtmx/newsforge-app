@@ -3,10 +3,36 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, X, Send, Loader2, Sparkles } from "lucide-react";
+import { 
+  MessageCircle, 
+  X, 
+  Send, 
+  Loader2, 
+  Sparkles, 
+  Plus,
+  Trash2,
+  History
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,7 +46,16 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showConversations, setShowConversations] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch conversations list
+  const { data: conversations, refetch: refetchConversations } = 
+    trpc.chat.listConversations.useQuery(undefined, {
+      enabled: isOpen,
+    });
 
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: (data) => {
@@ -30,10 +65,28 @@ export function ChatWidget() {
         { role: "assistant", content: data.message, metadata: data.metadata }
       ]);
       setIsLoading(false);
+      refetchConversations();
     },
     onError: (error) => {
       toast.error(`Failed to send message: ${error.message}`);
       setIsLoading(false);
+    },
+  });
+
+  const deleteConversation = trpc.chat.deleteConversation.useMutation({
+    onSuccess: () => {
+      toast.success("Conversation deleted");
+      if (conversationToDelete === conversationId) {
+        // If deleting current conversation, start fresh
+        setConversationId(null);
+        setMessages([]);
+      }
+      setConversationToDelete(null);
+      setDeleteDialogOpen(false);
+      refetchConversations();
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete conversation: ${error.message}`);
     },
   });
 
@@ -55,6 +108,24 @@ export function ChatWidget() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleNewConversation = () => {
+    setConversationId(null);
+    setMessages([]);
+    setShowConversations(false);
+    toast.success("Started new conversation");
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    setConversationToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (conversationToDelete) {
+      deleteConversation.mutate({ conversationId: conversationToDelete });
     }
   };
 
@@ -87,14 +158,60 @@ export function ChatWidget() {
               <Sparkles className="h-5 w-5 text-primary" />
               <h3 className="font-semibold text-lg">NewsForge Assistant</h3>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Conversation Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Conversation menu">
+                    <History className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleNewConversation}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Conversation
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {conversations && conversations.length > 0 ? (
+                    conversations.slice(0, 5).map((conv) => (
+                      <DropdownMenuItem
+                        key={conv.id}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="truncate flex-1">
+                          {conv.title || "Untitled"}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteConversation(conv.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>
+                      No conversations yet
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(false)}
+                aria-label="Close chat"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -106,9 +223,10 @@ export function ChatWidget() {
                   Ask me anything about your NewsForge archive
                 </p>
                 <div className="text-xs text-muted-foreground space-y-1 mt-4">
-                  <p>Try asking:</p>
+                  <p className="font-medium">Try asking:</p>
                   <p className="italic">"What were my top AI stories last week?"</p>
-                  <p className="italic">"Create a YouTube script about recent tech news"</p>
+                  <p className="italic">"Show me all tech regulation topics"</p>
+                  <p className="italic">"Create a YouTube script about recent AI news"</p>
                 </div>
               </div>
             ) : (
@@ -129,7 +247,6 @@ export function ChatWidget() {
                         <ReactMarkdown 
                           className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0"
                           components={{
-                            // Customize link styling
                             a: ({ node, ...props }) => (
                               <a {...props} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" />
                             ),
@@ -139,6 +256,11 @@ export function ChatWidget() {
                         </ReactMarkdown>
                       ) : (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                      {msg.metadata && msg.metadata.tokens && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {msg.metadata.tokens} tokens
+                        </p>
                       )}
                     </div>
                   </div>
@@ -185,6 +307,23 @@ export function ChatWidget() {
           </div>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the conversation
+              and all its messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
