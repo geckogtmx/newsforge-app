@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X, Flame, ChevronDown, ChevronUp, DollarSign, Info } from "lucide-react";
+import { ExternalLink, Search, ChevronRight, Filter, Globe, Loader2, Plus, X, Flame, ChevronDown, ChevronUp, DollarSign, Info, Bell } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -23,6 +23,7 @@ interface Headline {
   deduplicationGroupId?: string;
   heatScore?: number;
   isBestVersion?: boolean;
+  matchedKeywords?: string[] | string;
 }
 
 interface DeduplicationGroup {
@@ -129,7 +130,7 @@ export default function NewsInbox() {
   // Update headlines when data is loaded
   useEffect(() => {
     if (headlinesData) {
-      setHeadlines(
+          setHeadlines(
         headlinesData.map((h) => ({
           id: h.id,
           title: h.title,
@@ -139,6 +140,7 @@ export default function NewsInbox() {
           publishedAt: h.publishedAt ? new Date(h.publishedAt) : new Date(),
           isSelected: h.isSelected,
           category: undefined, // TODO: Add category extraction
+          matchedKeywords: h.matchedKeywords,
         }))
       );
       setSelectedCount(headlinesData.filter((h) => h.isSelected).length);
@@ -525,7 +527,15 @@ export default function NewsInbox() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <CardTitle className="text-base leading-tight">{headline.title}</CardTitle>
+                          <div className="flex flex-col gap-1">
+                            {headline.matchedKeywords && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <Bell className="w-3 h-3 text-orange-500" />
+                                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Alert Match</span>
+                              </div>
+                            )}
+                            <CardTitle className="text-base leading-tight">{headline.title}</CardTitle>
+                          </div>
                           {headline.category && (
                             <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded whitespace-nowrap flex-shrink-0">
                               {headline.category}

@@ -4,7 +4,8 @@ import { TRPCError } from "@trpc/server";
 import { eq, and, inArray } from "drizzle-orm";
 import { compiledItems, contentPackages, userSettings } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { generateYouTubeAssets, regenerateYouTubeAsset } from "../services/youtubeAssetGeneration";
+import { generateYouTubeAssets } from "../services/youtubeAssetGeneration";
+import { trackHeadlinesFinalized } from "../services/sourceQualityScoring";
 import { estimateYouTubeAssetCost } from "../services/costEstimation";
 import { nanoid } from "nanoid";
 import { runs } from "../../drizzle/schema";
@@ -197,6 +198,9 @@ export const youtubeRouter = router({
           });
         }
       }
+
+      // Track finalization for quality scoring
+      await trackHeadlinesFinalized(input.runId);
 
       return {
         success: true,

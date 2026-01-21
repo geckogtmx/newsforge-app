@@ -33,6 +33,7 @@ export default function Sources() {
   const createSource = trpc.sources.createSource.useMutation();
   const deleteSource = trpc.sources.deleteSource.useMutation();
   const testConnection = trpc.sources.testConnection.useMutation();
+  const updateRating = trpc.sources.updateRating.useMutation();
 
   const handleAddSource = async () => {
     if (!formData.name) {
@@ -125,6 +126,16 @@ export default function Sources() {
       }
     } catch (error) {
       toast.error("Failed to test connection");
+    }
+  };
+
+  const handleUpdateRating = async (sourceId: string, sourceName: string, rating: -1 | 0 | 1) => {
+    try {
+      await updateRating.mutateAsync({ id: sourceId, rating });
+      toast.success(`Rating updated for "${sourceName}"`);
+      refetch();
+    } catch (error) {
+      toast.error("Failed to update rating");
     }
   };
 
@@ -413,16 +424,56 @@ export default function Sources() {
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="flex items-center gap-1">
+                      {/* Quality Score Section */}
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
                           <TrendingUp className="w-4 h-4" />
-                          Quality: {getQualityBadge(source.qualityScore)}
-                        </span>
-                        {source.totalHeadlines !== null && source.totalHeadlines > 0 && (
-                          <span className="text-sm">
-                            {source.totalHeadlines} headlines collected
-                          </span>
+                          <span className="text-sm font-medium">Quality Score:</span>
+                          {getQualityBadge(source.qualityScore)}
+                        </div>
+                        
+                        {/* Detailed Metrics */}
+                        {source.totalHeadlines > 0 && (
+                          <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground">Total</span>
+                              <span className="font-semibold">{source.totalHeadlines}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground">Selected</span>
+                              <span className="font-semibold">{source.selectedHeadlines} ({source.selectionRate}%)</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground">Final</span>
+                              <span className="font-semibold">{source.finalHeadlines} ({source.finalRate}%)</span>
+                            </div>
+                          </div>
                         )}
+                        
+                        {/* User Rating Buttons */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Your rating:</span>
+                          <div className="flex gap-1">
+                            <Button
+                              variant={source.userRating === 1 ? "default" : "outline"}
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => handleUpdateRating(source.id, source.name, source.userRating === 1 ? 0 : 1)}
+                              disabled={updateRating.isPending}
+                            >
+                              <ThumbsUp className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant={source.userRating === -1 ? "destructive" : "outline"}
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => handleUpdateRating(source.id, source.name, source.userRating === -1 ? 0 : -1)}
+                              disabled={updateRating.isPending}
+                            >
+                              <ThumbsDown className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </CardDescription>
                   </div>

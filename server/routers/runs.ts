@@ -5,6 +5,9 @@ import { runs, rawHeadlines, newsSources } from "../../drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { aggregateHeadlines } from "../services/headlineAggregator";
+import { trackHeadlinesCollected, trackHeadlinesSelected } from "../services/sourceQualityScoring";
+import { checkHeadlinesForAlerts, incrementAlertMatchCounts } from "../services/keywordAlerts";
+import { keywordAlerts } from "../../drizzle/schema";
 import { googleCustomSearch } from "../services/googleSearch";
 import { groupHeadlines, applyDeduplicationGroups } from "../services/deduplicationEngine";
 import { nanoid } from "nanoid";
@@ -52,10 +55,25 @@ export const runsRouter = router({
       // Fetch headlines from all sources
       const allHeadlines = await aggregateHeadlines(userSources);
 
-      // Use the created run ID
+      // Get active keyword alerts for the user
+      const activeAlerts = await db
+        .select()
+        .from(keywordAlerts)
+        .where(and(eq(keywordAlerts.userId, ctx.user.id), eq(keywordAlerts.isActive, true)));
 
-      // Save raw headlines to database
+      // Save raw headlines to database and check for alerts
+      const sourceHeadlineCounts: Record<string, number> = {};
+      const alertMatches: any[] = [];
+      
       for (const headline of allHeadlines) {
+        // Check for keyword matches
+        const matches = checkHeadlinesForAlerts([headline as any], activeAlerts);
+        const matchedKeywordIds = matches.map(m => m.alertId);
+        
+        if (matches.length > 0) {
+          alertMatches.push(...matches);
+        }
+
         await db.insert(rawHeadlines).values({
           runId,
           sourceId: headline.sourceId || "",
@@ -65,7 +83,23 @@ export const runsRouter = router({
           publishedAt: headline.publishedAt,
           source: headline.source as any,
           isSelected: false,
+          matchedKeywords: matchedKeywordIds.length > 0 ? JSON.stringify(matchedKeywordIds) : null,
         });
+        
+        // Track headline count per source
+        if (headline.sourceId) {
+          sourceHeadlineCounts[headline.sourceId] = (sourceHeadlineCounts[headline.sourceId] || 0) + 1;
+        }
+      }
+
+      // Update alert match counts
+      if (alertMatches.length > 0) {
+        await incrementAlertMatchCounts(alertMatches);
+      }
+      
+      // Update source quality tracking
+      for (const [sourceId, count] of Object.entries(sourceHeadlineCounts)) {
+        await trackHeadlinesCollected(sourceId, count);
       }
 
       // Update run stats
@@ -215,6 +249,9 @@ export const runsRouter = router({
             .set({ isSelected: true })
             .where(inArray(rawHeadlines.id, input.headlineIds));
         }
+
+        // Track selection for quality scoring
+        await trackHeadlinesSelected(input.runId);
 
         return { success: true, selectedCount: input.headlineIds.length };
       } catch (error) {

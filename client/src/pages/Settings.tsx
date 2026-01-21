@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useVaultPathPicker } from "@/hooks/useVaultPathPicker";
+import { isElectron } from "@shared/environment";
 
 export default function Settings() {
   // TODO: Fetch from API
@@ -31,6 +33,21 @@ export default function Settings() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const { pickDirectory, selectedPath, hasNativePicker } = useVaultPathPicker();
+
+  // Update settings when path is picked
+  useEffect(() => {
+    if (selectedPath) {
+      setSettings({ ...settings, obsidianVaultPath: selectedPath });
+    }
+  }, [selectedPath]);
+
+  const handlePickDirectory = async () => {
+    const path = await pickDirectory();
+    if (path) {
+      toast.success(`Selected: ${path}`);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -192,15 +209,31 @@ export default function Settings() {
                 <Label htmlFor="obsidianPath" className="text-sm font-medium text-foreground mb-2 block">
                   Obsidian Vault Path
                 </Label>
-                <Input
-                  id="obsidianPath"
-                  value={settings.obsidianVaultPath}
-                  onChange={(e) => setSettings({ ...settings, obsidianVaultPath: e.target.value })}
-                  placeholder="/path/to/your/obsidian/vault"
-                  className="bg-input border-border"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="obsidianPath"
+                    value={settings.obsidianVaultPath}
+                    onChange={(e) => setSettings({ ...settings, obsidianVaultPath: e.target.value })}
+                    placeholder="/path/to/your/obsidian/vault"
+                    className="bg-input border-border flex-1"
+                  />
+                  {hasNativePicker && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handlePickDirectory}
+                      title="Browse for directory"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  The path where your Obsidian vault is located. Content will be exported here.
+                  {hasNativePicker 
+                    ? "Click the folder icon to browse, or type the path manually."
+                    : "The path where your Obsidian vault is located. Content will be exported here."
+                  }
                 </p>
               </div>
 

@@ -6,6 +6,9 @@
  */
 
 import type { KeywordAlert, RawHeadline } from "../../drizzle/schema";
+import { keywordAlerts } from "../../drizzle/schema";
+import { getDb } from "../db";
+import { eq, sql } from "drizzle-orm";
 
 export interface KeywordMatch {
   headlineId: number;
@@ -201,6 +204,31 @@ export function suggestKeywords(headlines: RawHeadline[], topN: number = 10): st
     .map(([word]) => word);
 
   return sorted;
+}
+
+/**
+ * Increment match counts for alerts in the database
+ */
+export async function incrementAlertMatchCounts(matches: KeywordMatch[]): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  // Count matches per alert ID
+  const counts = new Map<string, number>();
+  for (const match of matches) {
+    counts.set(match.alertId, (counts.get(match.alertId) || 0) + 1);
+  }
+
+  // Update database for each alert
+  for (const [alertId, count] of Array.from(counts.entries())) {
+    await db
+      .update(keywordAlerts)
+      .set({
+        matchCount: sql`${keywordAlerts.matchCount} + ${count}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(keywordAlerts.id, alertId));
+  }
 }
 
 /**

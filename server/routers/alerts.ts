@@ -146,6 +146,25 @@ export const alertsRouter = router({
     }),
 
   /**
+   * Toggle alert active status
+   */
+  toggle: protectedProcedure
+    .input(z.object({ id: z.string(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new Error("Database not available");
+      }
+
+      await db
+        .update(keywordAlerts)
+        .set({ isActive: input.isActive })
+        .where(and(eq(keywordAlerts.id, input.id), eq(keywordAlerts.userId, ctx.user.id)));
+
+      return { success: true };
+    }),
+
+  /**
    * Get alert statistics
    */
   getStatistics: protectedProcedure

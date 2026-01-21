@@ -8,6 +8,11 @@ import { nanoid } from "nanoid";
 import { parseRSSFeed } from "../services/rssParser";
 import { scrapeWebsite } from "../services/webScraper";
 import { fetchYouTubeChannelVideos } from "../services/youtubeIntegration";
+import {
+  updateSourceRating,
+  recalculateAllQualityScores,
+  getSourceQualityMetrics,
+} from "../services/sourceQualityScoring";
 
 const sourceTypeEnum = z.enum(["rss", "gmail", "youtube", "website"]);
 
@@ -276,4 +281,98 @@ export const sourcesRouter = router({
         };
       }
     }),
+
+  /**
+   * Update user rating for a source
+   */
+  updateRating: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        rating: z.number().min(-1).max(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify source belongs to user
+        const sources = await db
+          .select()
+          .from(newsSources)
+          .where(and(eq(newsSources.id, input.id), eq(newsSources.userId, ctx.user.id)))
+          .limit(1);
+
+        if (sources.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source not found" });
+        }
+
+        // Update rating and recalculate quality score
+        await updateSourceRating(input.id, input.rating as -1 | 0 | 1);
+
+        return { success: true };
+      } catch (error) {
+        console.error("[Sources] Error updating rating:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to update rating",
+        });
+      }
+    }),
+
+  /**
+   * Get quality metrics for a source
+   */
+  getQualityMetrics: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      try {
+        // Verify source belongs to user
+        const sources = await db
+          .select()
+          .from(newsSources)
+          .where(and(eq(newsSources.id, input.id), eq(newsSources.userId, ctx.user.id)))
+          .limit(1);
+
+        if (sources.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source not found" });
+        }
+
+        const metrics = await getSourceQualityMetrics(input.id);
+        return metrics;
+      } catch (error) {
+        console.error("[Sources] Error getting quality metrics:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to get quality metrics",
+        });
+      }
+    }),
+
+  /**
+   * Recalculate quality scores for all sources
+   */
+  recalculateQualityScores: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const updatedCount = await recalculateAllQualityScores(ctx.user.id);
+      return {
+        success: true,
+        updatedCount,
+      };
+    } catch (error) {
+      console.error("[Sources] Error recalculating quality scores:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error instanceof Error ? error.message : "Failed to recalculate quality scores",
+      });
+    }
+  }),
 });

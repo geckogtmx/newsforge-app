@@ -3,10 +3,20 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "main": "./dist-electron/main/index.js",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
+    "dev": "electron-vite dev --watch",
+    "dev:web": "NODE_ENV=development tsx watch server/_core/index.ts",
+    "build": "pnpm build:server && electron-vite build",
+    "build:server": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:web": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "preview": "electron-vite preview",
+    "package": "pnpm build && electron-builder",
+    "package:win": "pnpm build && electron-builder --win",
+    "package:mac": "pnpm build && electron-builder --mac",
+    "package:linux": "pnpm build && electron-builder --linux",
+    "start": "electron .",
+    "start:web": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
@@ -96,6 +106,9 @@
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.4.0",
+    "electron-vite": "^5.0.0",
     "esbuild": "^0.25.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
@@ -115,6 +128,53 @@
     },
     "overrides": {
       "tailwindcss>nanoid": "3.3.7"
+    }
+  },
+  "build": {
+    "appId": "com.geckogtmx.newsforge",
+    "productName": "NewsForge",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
